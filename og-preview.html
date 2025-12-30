@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OG Image Preview - FieldVision AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: #0A0A0A;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .og-card {
+            width: 1200px;
+            height: 630px;
+            background: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
+            border: 2px solid #3B9BD9;
+            border-radius: 0;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 80px;
+            text-align: center;
+        }
+        .og-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150%;
+            height: 100%;
+            background: radial-gradient(ellipse at center top, rgba(59, 155, 217, 0.15) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .logo {
+            width: 120px;
+            height: 120px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 40px;
+            position: relative;
+            z-index: 2;
+        }
+        .logo img {
+            width: 80px;
+            height: auto;
+        }
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 72px;
+            font-weight: 700;
+            color: #FFFFFF;
+            margin-bottom: 20px;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            position: relative;
+            z-index: 2;
+        }
+        .highlight {
+            color: #3B9BD9;
+        }
+        p {
+            font-size: 32px;
+            color: #AAAAAA;
+            max-width: 900px;
+            line-height: 1.5;
+            position: relative;
+            z-index: 2;
+        }
+        .badge {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            background: rgba(52, 199, 89, 0.15);
+            border: 2px solid #34C759;
+            color: #34C759;
+            padding: 12px 24px;
+            border-radius: 100px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            z-index: 2;
+        }
+        .domain {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #888888;
+            font-size: 24px;
+            font-weight: 500;
+            z-index: 2;
+        }
+        .instructions {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(59, 155, 217, 0.1);
+            border: 1px solid #3B9BD9;
+            color: #3B9BD9;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="og-card">
+        <div class="badge">BETA NOW LIVE</div>
+        <div class="logo">
+            <img src="logo_backup.png" alt="FieldVision">
+        </div>
+        <h1>Get home <span class="highlight">30 minutes</span> earlier.</h1>
+        <p>AI-powered daily reports in 30 seconds. Photos, video, or voice—FieldVision fuses it all.</p>
+        <div class="domain">getfieldvision.ai</div>
+    </div>
+    <div class="instructions">
+        📸 Screenshot this card at exactly 1200x630px for og-image.png
+    </div>
+</body>
+</html>
