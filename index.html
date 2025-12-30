@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FieldVision AI | Get Home 30 Minutes Earlier</title>
+    <meta name="description" content="Photos, video, or voice — FieldVision fuses it all into one professional daily report in 30 seconds. Built by a GC for superintendents.">
+    <meta name="keywords" content="construction daily report, AI daily report, superintendent software, field reporting, construction app, daily log">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="FieldVision AI | Get Home 30 Minutes Earlier">
+    <meta property="og:description" content="Photos, video, or voice — FieldVision fuses it all into one professional daily report in 30 seconds. Built by a GC for superintendents.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="og-image.png">
+    <meta property="og:url" content="https://getfieldvision.ai">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="FieldVision AI | Get Home 30 Minutes Earlier">
+    <meta name="twitter:description" content="Photos, video, or voice — FieldVision fuses it all into one professional daily report in 30 seconds.">\
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --fv-blue: #3B9BD9;
+            --fv-blue-dark: #2A7BB5;
+            --fv-blue-glow: rgba(59, 155, 217, 0.3);
+            --fv-black: #0A0A0A;
+            --fv-dark: #111111;
+            --fv-gray-900: #1A1A1A;
+            --fv-gray-800: #252525;
+            --fv-gray-700: #333333;
+            --fv-gray-400: #888888;
+            --fv-gray-300: #AAAAAA;
+            --fv-white: #FFFFFF;
+            --fv-green: #34C759;
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-body: 'DM Sans', sans-serif;
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; overflow-x: hidden; width: 100%; }
+        @media (max-width: 768px) {
+            html { scroll-behavior: auto; } /* Disable smooth scroll on mobile to prevent swaying */
+        }
+        body { font-family: var(--font-body); background: var(--fv-black); color: var(--fv-white); line-height: 1.6; overflow-x: hidden; -webkit-overflow-scrolling: touch; width: 100%; position: relative; }
+        body::before { content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"); opacity: 0.03; pointer-events: none; z-index: 1000; }
+        a { color: inherit; text-decoration: none; }
+
+        /* Navigation */
+        .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 1.5rem 3rem; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(to bottom, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0) 100%); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        .nav-logo { display: flex; align-items: center; gap: 0.75rem; font-family: var(--font-display); font-weight: 600; font-size: 1.25rem; letter-spacing: -0.02em; }
+        .nav-logo-pill { display: flex; align-items: center; justify-content: center; background: #FFFFFF; border-radius: 50%; padding: 0.35rem; }
+        .nav-logo-pill img { height: 24px; width: auto; display: block; }
+        .nav-cta { font-family: var(--font-display); font-weight: 500; font-size: 0.875rem; padding: 0.75rem 1.5rem; background: var(--fv-blue); color: var(--fv-white); border-radius: 6px; transition: all 0.3s var(--ease-out-expo); border: 1px solid transparent; }
+        .nav-cta:hover { background: transparent; border-color: var(--fv-blue); box-shadow: 0 0 30px var(--fv-blue-glow); }
+
+        /* Hero */
+        .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 6rem 2rem; position: relative; }
+        .hero::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 150%; height: 100%; background: radial-gradient(ellipse at center top, var(--fv-blue-glow) 0%, transparent 50%); pointer-events: none; }
+
+        .hero-logo { margin-bottom: 2rem; animation: fadeInUp 0.8s var(--ease-out-expo) 0.1s both; }
+        .hero-logo-wrapper { display: inline-block; background: #FFFFFF; border-radius: 50%; padding: 2.5rem; }
+        .hero-logo img { height: 200px; width: auto; display: block; }
+        .hero-logo-text { font-family: var(--font-display); font-size: 3rem; font-weight: 700; letter-spacing: -0.02em; margin-top: 1.5rem; color: var(--fv-white); }
+
+        .hero-badge { display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--font-display); font-size: 0.8rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.15em; color: var(--fv-green); padding: 0.5rem 1rem; border: 1px solid var(--fv-green); border-radius: 100px; margin-bottom: 2rem; background: rgba(52, 199, 89, 0.1); animation: fadeInUp 0.8s var(--ease-out-expo) 0.3s both; }
+        .hero-badge::before { content: ''; width: 6px; height: 6px; background: var(--fv-green); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
+
+        .hero h1 { font-family: var(--font-display); font-size: clamp(2.5rem, 8vw, 5rem); font-weight: 700; line-height: 1.1; letter-spacing: -0.03em; max-width: 900px; margin-bottom: 1.5rem; animation: fadeInUp 0.8s var(--ease-out-expo) 0.5s both; }
+        .hero h1 .highlight { color: var(--fv-blue); }
+        .hero-sub { font-size: clamp(1rem, 2.5vw, 1.25rem); color: var(--fv-gray-300); max-width: 600px; margin-bottom: 3rem; line-height: 1.7; animation: fadeInUp 0.8s var(--ease-out-expo) 0.7s both; }
+        .hero-cta-group { display: flex; flex-direction: column; align-items: center; gap: 1rem; animation: fadeInUp 0.8s var(--ease-out-expo) 0.9s both; }
+        .hero-buttons { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+        .btn-primary { font-family: var(--font-display); font-weight: 600; font-size: 1rem; padding: 1rem 2rem; background: var(--fv-blue); color: var(--fv-white); border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s var(--ease-out-expo); position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn-primary:hover { background: var(--fv-blue-dark); transform: translateY(-2px); box-shadow: 0 10px 40px var(--fv-blue-glow); }
+        .btn-secondary { font-family: var(--font-display); font-weight: 600; font-size: 1rem; padding: 1rem 2rem; background: transparent; color: var(--fv-white); border: 1px solid var(--fv-gray-700); border-radius: 8px; cursor: pointer; transition: all 0.3s var(--ease-out-expo); display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn-secondary:hover { border-color: var(--fv-blue); color: var(--fv-blue); }
+        .hero-note { font-size: 0.85rem; color: var(--fv-gray-400); }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* App Preview Section */
+        .app-preview { padding: 4rem 2rem 8rem; position: relative; overflow: hidden; }
+        .app-preview::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--fv-gray-700), transparent); }
+        .preview-container { max-width: 1200px; margin: 0 auto; }
+        .preview-header { text-align: center; margin-bottom: 3rem; }
+        .preview-header h2 { font-family: var(--font-display); font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 600; margin-bottom: 0.5rem; }
+        .preview-header p { color: var(--fv-gray-400); }
+
+        .phone-showcase { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; perspective: 1000px; }
+        .phone-frame { background: linear-gradient(145deg, #1a1a1a, #0d0d0d); border-radius: 40px; padding: 12px; box-shadow: 0 25px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1); transition: transform 0.5s var(--ease-out-expo); }
+        .phone-frame:hover { transform: translateY(-10px) rotateX(5deg); }
+        .phone-frame img { border-radius: 30px; width: 280px; height: auto; display: block; }
+        .phone-label { text-align: center; margin-top: 1rem; font-size: 0.9rem; color: var(--fv-gray-400); font-weight: 500; }
+
+        /* Problem Section */
+        .problem { padding: 8rem 2rem; background: var(--fv-dark); position: relative; }
+        .problem::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--fv-gray-700), transparent); }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section-label { font-family: var(--font-display); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em; color: var(--fv-blue); margin-bottom: 1rem; }
+        .problem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; }
+        .problem-content h2 { font-family: var(--font-display); font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 1.5rem; }
+        .problem-content p { color: var(--fv-gray-300); font-size: 1.1rem; line-height: 1.8; margin-bottom: 1rem; }
+        .problem-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; padding: 2rem; background: var(--fv-gray-900); border-radius: 16px; border: 1px solid var(--fv-gray-800); }
+        .stat { text-align: center; }
+        .stat-number { font-family: var(--font-display); font-size: 2.5rem; font-weight: 700; color: var(--fv-blue); line-height: 1; margin-bottom: 0.5rem; }
+        .stat-label { font-size: 0.85rem; color: var(--fv-gray-400); }
+
+        /* How It Works */
+        .how-it-works { padding: 8rem 2rem; }
+        .how-it-works .container { text-align: center; }
+        .how-it-works h2 { font-family: var(--font-display); font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4rem; }
+        .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3rem; position: relative; }
+        .steps::before { content: ''; position: absolute; top: 60px; left: 20%; right: 20%; height: 2px; background: linear-gradient(90deg, var(--fv-gray-800), var(--fv-blue), var(--fv-gray-800)); }
+        .step { position: relative; padding: 2rem; }
+        .step-number { width: 50px; height: 50px; background: var(--fv-gray-900); border: 2px solid var(--fv-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; color: var(--fv-blue); margin: 0 auto 1.5rem; position: relative; z-index: 1; }
+        .step-icon { width: 80px; height: 80px; background: linear-gradient(135deg, var(--fv-gray-900), var(--fv-gray-800)); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; border: 1px solid var(--fv-gray-700); }
+        .step-icon svg { width: 36px; height: 36px; stroke: var(--fv-blue); stroke-width: 1.5; fill: none; }
+        .step h3 { font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; }
+        .step p { color: var(--fv-gray-400); font-size: 0.95rem; line-height: 1.6; }
+
+        /* Features Section */
+        .features { padding: 8rem 2rem; background: var(--fv-dark); position: relative; }
+        .features::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--fv-gray-700), transparent); }
+        .features .container { text-align: center; }
+        .features h2 { font-family: var(--font-display); font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; letter-spacing: -0.02em; margin-bottom: 1rem; }
+        .features > .container > p { color: var(--fv-gray-400); margin-bottom: 4rem; }
+        .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; text-align: left; }
+        .feature-card { background: var(--fv-gray-900); border: 1px solid var(--fv-gray-800); border-radius: 16px; padding: 2rem; transition: all 0.6s var(--ease-out-expo); opacity: 1; }
+        .feature-card.glow-active { border-color: var(--fv-blue); box-shadow: 0 0 40px var(--fv-blue-glow), 0 0 80px rgba(59, 155, 217, 0.2); }
+        .feature-card:hover { transform: translateY(-4px); }
+        .feature-icon { width: 50px; height: 50px; background: linear-gradient(135deg, var(--fv-blue), var(--fv-blue-dark)); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; }
+        .feature-icon svg { width: 24px; height: 24px; stroke: var(--fv-white); stroke-width: 2; fill: none; }
+        .feature-card h3 { font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; }
+        .feature-card p { color: var(--fv-gray-400); font-size: 0.95rem; line-height: 1.6; }
+        .feature-quote { font-style: italic; color: var(--fv-gray-300); margin-top: 1rem; font-size: 0.9rem; }
+
+        /* Builder Section */
+        .builder { padding: 8rem 2rem; position: relative; }
+        .builder-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 4rem; align-items: center; }
+        .builder-card { background: linear-gradient(135deg, var(--fv-gray-900), var(--fv-gray-800)); border: 1px solid var(--fv-gray-700); border-radius: 24px; padding: 3rem; position: relative; overflow: hidden; }
+        .builder-card::before { content: ''; position: absolute; top: -50%; right: -50%; width: 100%; height: 100%; background: radial-gradient(circle, var(--fv-blue-glow) 0%, transparent 70%); opacity: 0.5; }
+        .builder-icon { width: 80px; height: 80px; background: var(--fv-blue); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 2rem; position: relative; }
+        .builder-icon svg { width: 40px; height: 40px; stroke: var(--fv-white); stroke-width: 1.5; fill: none; }
+        .builder-quote { font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; line-height: 1.5; position: relative; color: var(--fv-white); }
+        .builder-content h2 { font-family: var(--font-display); font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 1.5rem; }
+        .builder-content h2 span { color: var(--fv-blue); }
+        .builder-content p { color: var(--fv-gray-300); font-size: 1.1rem; line-height: 1.8; margin-bottom: 1.5rem; }
+        .builder-list { list-style: none; }
+        .builder-list li { display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem; color: var(--fv-gray-300); }
+        .builder-list li svg { width: 20px; height: 20px; stroke: var(--fv-blue); stroke-width: 2; fill: none; flex-shrink: 0; margin-top: 0.2rem; }
+
+        /* CTA Section */
+        .cta { padding: 8rem 2rem; text-align: center; position: relative; }
+        .cta::before { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 150%; height: 100%; background: radial-gradient(ellipse at center bottom, var(--fv-blue-glow) 0%, transparent 50%); pointer-events: none; }
+        .cta h2 { font-family: var(--font-display); font-size: clamp(1.75rem, 4vw, 3rem); font-weight: 700; letter-spacing: -0.02em; margin-bottom: 1rem; }
+        .cta p { color: var(--fv-gray-300); font-size: 1.1rem; margin-bottom: 2.5rem; max-width: 500px; margin-left: auto; margin-right: auto; }
+        .cta-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem; }
+        .trust-badges { display: flex; gap: 2rem; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 2rem; }
+        .trust-badge { display: flex; align-items: center; gap: 0.5rem; color: var(--fv-gray-400); font-size: 0.85rem; }
+        .trust-badge svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+
+        /* Footer */
+        .footer { padding: 3rem 2rem; border-top: 1px solid var(--fv-gray-800); }
+        .footer-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .footer-logo { display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-display); font-weight: 600; font-size: 1rem; }
+        .footer-logo-pill { display: flex; align-items: center; justify-content: center; background: #FFFFFF; border-radius: 50%; padding: 0.25rem; }
+        .footer-logo-pill img { height: 18px; width: auto; display: block; }
+        .footer-links { display: flex; gap: 2rem; }
+        .footer-links a { color: var(--fv-gray-400); font-size: 0.85rem; transition: color 0.2s; }
+        .footer-links a:hover { color: var(--fv-blue); }
+        .footer-text { color: var(--fv-gray-400); font-size: 0.85rem; }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .nav { padding: 1rem 1.5rem; }
+            .problem-grid, .builder-grid { grid-template-columns: 1fr; gap: 3rem; }
+            .steps { grid-template-columns: 1fr; gap: 2rem; }
+            .steps::before { display: none; }
+            .problem-stats { grid-template-columns: 1fr; gap: 1.5rem; }
+            .builder-visual { order: -1; }
+            .hero-logo-wrapper { padding: 2rem; }
+            .hero-logo img { height: 160px; }
+            .hero-logo-text { font-size: 2.5rem; }
+            .feature-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 700px) {
+            .feature-grid { grid-template-columns: 1fr; }
+            .phone-showcase { gap: 1rem; }
+            .phone-frame img { width: 200px; }
+        }
+        @media (max-width: 600px) {
+            .hero { min-height: auto; padding: 8rem 1.5rem 6rem; } /* Fix mobile viewport height swaying */
+            .hero-logo-wrapper { padding: 1.5rem; }
+            .hero-logo img { height: 120px; }
+            .hero-logo-text { font-size: 2rem; }
+            .hero-buttons { flex-direction: column; width: 100%; max-width: 350px; }
+            .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
+            .cta-buttons { flex-direction: column; align-items: center; }
+            .cta-buttons .btn-primary, .cta-buttons .btn-secondary { width: 100%; max-width: 350px; }
+            .phone-frame { padding: 8px; }
+            .phone-frame img { width: 160px; border-radius: 24px; }
+            .footer-content { flex-direction: column; text-align: center; }
+            .footer-links { flex-wrap: wrap; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="#" class="nav-logo">
+            <div class="nav-logo-pill"><img src="logo_backup.png" alt="FieldVision"></div>
+            <span>FieldVision AI</span>
+        </a>
+        <a href="#beta" class="nav-cta">Join Beta</a>
+    </nav>
+
+    <section class="hero">
+        <div class="hero-logo">
+            <div class="hero-logo-wrapper">
+                <img src="logo_backup.png" alt="FieldVision AI">
+            </div>
+            <div class="hero-logo-text">FieldVision AI</div>
+        </div>
+        <span class="hero-badge">Beta Now Available</span>
+        <h1>Get home <span class="highlight">30 minutes earlier.</span></h1>
+        <p class="hero-sub">Photos, video, or voice — capture however you want. FieldVision fuses it all into one professional daily report in 30 seconds. Say it once, it syncs everywhere.</p>
+        <div class="hero-cta-group">
+            <div class="hero-buttons">
+                <a href="#beta" class="btn-primary">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                    Join TestFlight Beta
+                </a>
+                <a href="#how-it-works" class="btn-secondary">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/></svg>
+                    See How It Works
+                </a>
+            </div>
+            <p class="hero-note">Free during beta. No credit card required.</p>
+        </div>
+    </section>
+
+    <!-- App Preview -->
+    <section class="app-preview">
+        <div class="preview-container">
+            <div class="preview-header">
+                <h2>Built for the Job Site</h2>
+                <p>Clean, fast, and designed for one-handed use</p>
+            </div>
+            <div class="phone-showcase">
+                <div class="phone-wrapper">
+                    <div class="phone-frame">
+                        <img src="screenshots/01_home.png" alt="FieldVision Projects">
+                    </div>
+                    <p class="phone-label">Your Projects</p>
+                </div>
+                <div class="phone-wrapper">
+                    <div class="phone-frame">
+                        <img src="screenshots/02_project_detail.png" alt="FieldVision Daily Logs">
+                    </div>
+                    <p class="phone-label">Capture & Generate</p>
+                </div>
+                <div class="phone-wrapper">
+                    <div class="phone-frame">
+                        <img src="screenshots/04_daily_report.png" alt="FieldVision AI Report">
+                    </div>
+                    <p class="phone-label">AI-Generated Report</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="problem">
+        <div class="container">
+            <div class="problem-grid">
+                <div class="problem-content">
+                    <span class="section-label">The Problem</span>
+                    <h2>Documentation shouldn't be the hardest part of your job.</h2>
+                    <p>You're running crews, managing subs, solving problems on the fly. By the time you get home, the last thing you want to do is reconstruct what happened on site.</p>
+                    <p>So logs get skipped. Details get fuzzy. And when disputes arise, you're digging through texts and trying to remember what happened three months ago.</p>
+                </div>
+                <div class="problem-stats">
+                    <div class="stat">
+                        <div class="stat-number">45<span style="font-size: 1.5rem;">min</span></div>
+                        <div class="stat-label">Average time per daily report</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">62%</div>
+                        <div class="stat-label">Of supers skip logs when busy</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">$42K</div>
+                        <div class="stat-label">Average cost of documentation disputes</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <span class="section-label">How It Works</span>
+            <h2>Three steps. Thirty seconds. Zero double-entry.</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                    </div>
+                    <h3>Walk & Capture</h3>
+                    <p>Snap photos, record a video walkthrough, or talk as you go. Tag rooms as you capture. Mix and match — use whatever's fastest.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-icon">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 6v6l4 2"></path>
+                        </svg>
+                    </div>
+                    <h3>Generate</h3>
+                    <p>Tap one button. AI fuses your photos, video, voice, and notes into a structured daily report. Weather included automatically.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-icon">
+                        <svg viewBox="0 0 24 24">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </div>
+                    <h3>Send</h3>
+                    <p>Review, edit if needed, then PDF, email, or share in one tap. Done before you leave the site.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <span class="section-label">Features</span>
+            <h2>Everything you need. Nothing you don't.</h2>
+            <p>Built for superintendents, not IT departments.</p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    </div>
+                    <h3>Capture Your Way</h3>
+                    <p>Photos, video walkthrough, voice notes, or typed text. Use one or all. AI synthesizes everything into one report.</p>
+                    <p class="feature-quote">"I snap photos, ramble into my phone, and get a report my PM thinks I spent an hour on."</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    </div>
+                    <h3>Say It Once, Syncs Everywhere</h3>
+                    <p>Mention a punchlist item in your voice note? It auto-appears in your daily report, your notes, AND your todo list. No double entry. Ever.</p>
+                    <p class="feature-quote">"I stopped carrying a notepad. Everything I say ends up where it needs to be."</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    </div>
+                    <h3>Video Walkthrough</h3>
+                    <p>Record as you walk. AI extracts frames, analyzes progress, and writes your report from the footage. Hands-free documentation.</p>
+                    <p class="feature-quote">"I hit record, walk the site, stop recording. Report's done."</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    </div>
+                    <h3>Tag Rooms As You Go</h3>
+                    <p>Kitchen. Master bath. Garage. Tag photos and notes by location at capture time. Reports organize automatically by zone.</p>
+                    <p class="feature-quote">"No more scrolling through 50 photos wondering which room it was."</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+                    </div>
+                    <h3>Weather Built In</h3>
+                    <p>7-day forecast for every jobsite. Alerts before bad weather hits. Conditions auto-included in every daily report.</p>
+                    <p class="feature-quote">"Know what's coming before it costs you."</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                    </div>
+                    <h3>English & Spanish</h3>
+                    <p>Generate reports in both languages. Your crew reads Spanish, your PM reads English.</p>
+                    <p class="feature-quote">"Everyone's on the same page."</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="builder">
+        <div class="container">
+            <div class="builder-grid">
+                <div class="builder-visual">
+                    <div class="builder-card">
+                        <div class="builder-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M2 20h20M5 20V10l7-7 7 7v10M9 20v-6h6v6"></path>
+                            </svg>
+                        </div>
+                        <p class="builder-quote">"I've spent too many evenings reconstructing what happened on site instead of being with my family. I built FieldVision because I needed it."</p>
+                    </div>
+                </div>
+                <div class="builder-content">
+                    <span class="section-label">Why FieldVision</span>
+                    <h2>Built by a GC who's done <span>$40M+</span> in custom homes.</h2>
+                    <p>FieldVision isn't another tech product from people who've never set foot on a jobsite. It's built by someone who's run crews, managed custom home projects, and knows exactly how supers work.</p>
+                    <ul class="builder-list">
+                        <li>
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span>Designed for how builders actually work</span>
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span>No complex setup or training required</span>
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span>Works with the photos you're already taking</span>
+                        </li>
+                        <li>
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span>AI trained on real construction workflows</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta" id="beta">
+        <div class="container">
+            <span class="section-label">Join the Beta</span>
+            <h2>Get 30 minutes back. Every day.</h2>
+            <p>Join our TestFlight beta and be among the first to experience AI-powered daily reports. Free during beta.</p>
+            <div class="cta-buttons">
+                <a href="https://testflight.apple.com/join/XXXXX" class="btn-primary" target="_blank">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Join TestFlight Beta
+                </a>
+                <a href="mailto:steven@fieldvision.ai?subject=FieldVision Beta Interest" class="btn-secondary">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    Contact Us
+                </a>
+            </div>
+            <div class="trust-badges">
+                <div class="trust-badge">
+                    <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    iOS App
+                </div>
+                <div class="trust-badge">
+                    <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Your Data Stays Private
+                </div>
+                <div class="trust-badge">
+                    <svg viewBox="0 0 24 24"><path d="M2 20h20M5 20V10l7-7 7 7v10"/></svg>
+                    Built by a Licensed GC
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-logo">
+                <div class="footer-logo-pill"><img src="logo_backup.png" alt="FieldVision"></div>
+                <span>FieldVision AI</span>
+            </div>
+            <div class="footer-links">
+                <a href="privacy.html">Privacy Policy</a>
+                <a href="terms.html">Terms of Service</a>
+                <a href="mailto:support@fieldvision.ai">Support</a>
+            </div>
+            <p class="footer-text">© 2025 FieldVision AI. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Scroll-triggered glow effect for feature cards
+        const observerOptions = {
+            threshold: 0.3,
+            rootMargin: '0px 0px -100px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('glow-active');
+                } else {
+                    entry.target.classList.remove('glow-active');
+                }
+            });
+        }, observerOptions);
+
+        // Observe all feature cards
+        document.querySelectorAll('.feature-card').forEach(card => {
+            observer.observe(card);
+        });
+    </script>
+</body>
+</html>

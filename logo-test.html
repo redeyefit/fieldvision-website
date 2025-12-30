@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logo Test - Option 1 (White Container) vs Option 3 (White Glow)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Space Grotesk', sans-serif;
+            background: #0A0A0A; 
+            color: #fff; 
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        h1 { text-align: center; margin-bottom: 0.5rem; font-size: 1.5rem; }
+        p.subtitle { text-align: center; color: #888; margin-bottom: 3rem; font-size: 0.9rem; }
+        
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .option {
+            text-align: center;
+            padding: 3rem 2rem;
+            border: 1px solid #333;
+            border-radius: 20px;
+            background: #0A0A0A;
+        }
+        
+        .option h2 {
+            color: #3B9BD9;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .option p.desc {
+            color: #666;
+            font-size: 0.8rem;
+            margin-bottom: 2rem;
+        }
+        
+        .logo-container {
+            margin-bottom: 1.5rem;
+        }
+        
+        /* Option 2: White pill/capsule */
+        .option-2 .logo-wrapper {
+            display: inline-block;
+            background: #FFFFFF;
+            border-radius: 50%;
+            padding: 2rem;
+            aspect-ratio: 1;
+        }
+        .option-2 .logo-wrapper img {
+            height: 140px;
+            width: auto;
+            display: block;
+        }
+        
+        /* Option 3: White glow/blur */
+        .option-3 .logo-wrapper {
+            display: inline-block;
+            position: relative;
+        }
+        .option-3 .logo-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 70%;
+            background: radial-gradient(ellipse, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.4) 40%, transparent 70%);
+            filter: blur(20px);
+            z-index: 0;
+        }
+        .option-3 .logo-wrapper img {
+            height: 180px;
+            width: auto;
+            display: block;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .brand-text {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #fff;
+        }
+        
+        @media (max-width: 700px) {
+            .comparison { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Dark Theme + Original Logo</h1>
+    <p class="subtitle">Compare: White container vs White glow</p>
+    
+    <div class="comparison">
+        <div class="option option-2">
+            <h2>Option 2: White Pill</h2>
+            <p class="desc">Modern app-icon style capsule</p>
+            <div class="logo-container">
+                <div class="logo-wrapper">
+                    <img src="logo_backup.png" alt="FieldVision AI">
+                </div>
+            </div>
+            <div class="brand-text">FieldVision AI</div>
+        </div>
+        
+        <div class="option option-3">
+            <h2>Option 3: White Glow</h2>
+            <p class="desc">Soft radial blur behind logo</p>
+            <div class="logo-container">
+                <div class="logo-wrapper">
+                    <img src="logo_backup.png" alt="FieldVision AI">
+                </div>
+            </div>
+            <div class="brand-text">FieldVision AI</div>
+        </div>
+    </div>
+</body>
+</html>
