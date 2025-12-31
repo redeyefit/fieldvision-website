@@ -64,7 +64,8 @@
         .nav-cta:hover { background: transparent; border-color: var(--fv-blue); box-shadow: 0 0 30px var(--fv-blue-glow); }
 
         /* Hero */
-        .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 6rem 2rem; position: relative; }
+        .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 6rem 2rem; position: relative; overflow: hidden; }
+        .hero-video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; opacity: 0.3; }
         .hero::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 150%; height: 100%; background: radial-gradient(ellipse at center top, var(--fv-blue-glow) 0%, transparent 50%); pointer-events: none; }
 
         .hero-logo { margin-bottom: 2rem; animation: fadeInUp 0.8s var(--ease-out-expo) 0.1s both; }
@@ -224,6 +225,9 @@
     </nav>
 
     <section class="hero">
+        <video class="hero-video" autoplay muted loop playsinline>
+            <source src="hero.mp4" type="video/mp4">
+        </video>
         <div class="hero-logo">
             <div class="hero-logo-wrapper">
                 <img src="logo_backup.png" alt="FieldVision AI">
