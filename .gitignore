@@ -1,1 +1,9 @@
 .vercel
+
+# Local Netlify folder
+.netlify
+
+# Video production files (large binaries)
+scripts/video/src/*.mp4
+scripts/video/src/*.mp3
+scripts/video/build/
