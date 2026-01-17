@@ -2,16 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
 import { parseContractPDF } from '@/lib/ai/anthropic';
 
-// Conditional Vercel Blob import - only use in production with token
-const hasVercelBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
-let put: typeof import('@vercel/blob').put | null = null;
-if (hasVercelBlob) {
-  // Dynamic import to avoid SDK initialization error in dev
-  import('@vercel/blob').then((blob) => {
-    put = blob.put;
-  });
-}
-
 // Helper to verify project ownership
 async function verifyProjectOwnership(
   supabase: ReturnType<typeof createServerClient>,
@@ -76,13 +66,20 @@ export async function POST(
     // Upload to Vercel Blob (if available) or skip for local dev
     let pdfUrl: string | null = null;
 
-    if (put && hasVercelBlob) {
-      const blob = await put(`schedules/${id}/${file.name}`, file, {
-        access: 'public',
-      });
-      pdfUrl = blob.url;
-      // Update project with PDF URL
-      await supabase.from('projects').update({ pdf_url: pdfUrl }).eq('id', id);
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      try {
+        // Dynamic import to avoid SDK initialization error when token is missing
+        const { put } = await import('@vercel/blob');
+        const blob = await put(`schedules/${id}/${file.name}`, file, {
+          access: 'public',
+        });
+        pdfUrl = blob.url;
+        // Update project with PDF URL
+        await supabase.from('projects').update({ pdf_url: pdfUrl }).eq('id', id);
+      } catch (blobError) {
+        console.error('[Blob] Upload failed:', blobError);
+        // Continue without blob storage
+      }
     } else {
       // Local development - skip blob storage
       console.log('[Dev] Skipping Vercel Blob storage - BLOB_READ_WRITE_TOKEN not set');
