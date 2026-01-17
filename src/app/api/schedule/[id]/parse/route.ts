@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
 import { parseContractPDF } from '@/lib/ai/anthropic';
-import { put } from '@vercel/blob';
+
+// Conditional Vercel Blob import - only use in production with token
+const hasVercelBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+let put: typeof import('@vercel/blob').put | null = null;
+if (hasVercelBlob) {
+  // Dynamic import to avoid SDK initialization error in dev
+  import('@vercel/blob').then((blob) => {
+    put = blob.put;
+  });
+}
 
 // Helper to verify project ownership
 async function verifyProjectOwnership(
@@ -64,13 +73,20 @@ export async function POST(
       return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 });
     }
 
-    // Upload to Vercel Blob
-    const blob = await put(`schedules/${id}/${file.name}`, file, {
-      access: 'public',
-    });
+    // Upload to Vercel Blob (if available) or skip for local dev
+    let pdfUrl: string | null = null;
 
-    // Update project with PDF URL
-    await supabase.from('projects').update({ pdf_url: blob.url }).eq('id', id);
+    if (put && hasVercelBlob) {
+      const blob = await put(`schedules/${id}/${file.name}`, file, {
+        access: 'public',
+      });
+      pdfUrl = blob.url;
+      // Update project with PDF URL
+      await supabase.from('projects').update({ pdf_url: pdfUrl }).eq('id', id);
+    } else {
+      // Local development - skip blob storage
+      console.log('[Dev] Skipping Vercel Blob storage - BLOB_READ_WRITE_TOKEN not set');
+    }
 
     // Extract text from PDF
     // Note: For production, use a proper PDF parser like pdf-parse
@@ -79,7 +95,7 @@ export async function POST(
 
     if (!pdfText) {
       return NextResponse.json({
-        pdf_url: blob.url,
+        pdf_url: pdfUrl,
         message: 'PDF uploaded. Send text content to extract line items.',
         line_items: [],
       });
@@ -123,7 +139,7 @@ export async function POST(
           .order('created_at');
 
         return NextResponse.json({
-          pdf_url: blob.url,
+          pdf_url: pdfUrl,
           line_items: lineItems || [],
         });
       } catch (err) {
