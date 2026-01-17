@@ -152,28 +152,36 @@ export async function generateSchedule(
     reasoning?: string;
   }>;
 }> {
-  const systemPrompt = `You are a construction scheduling expert. Generate a realistic construction schedule from these line items.
+  const systemPrompt = `You are a construction scheduling expert. Generate a DETAILED construction schedule by breaking down each line item into realistic construction phases.
+
+CRITICAL: Break down each scope item into multiple sub-tasks representing real construction phases. For example:
+- "Stone countertops" becomes: Stone - Templates (1 day), Stone - Fabrication (5 days), Stone - Install (2 days), Stone - Seal (1 day)
+- "Electrical" becomes: Electrical - Rough-in (5 days), Electrical - Trim (3 days), Electrical - Finals/Testing (1 day)
+- "Tile work" becomes: Tile - Layout/Prep (1 day), Tile - Waterproofing (1 day), Tile - Install (5 days), Tile - Grout (2 days), Tile - Seal (1 day)
+- "Cabinets" becomes: Cabinets - Delivery/Stage (1 day), Cabinets - Install Base (2 days), Cabinets - Install Upper (2 days), Cabinets - Hardware/Adjust (1 day)
+
+NAMING FORMAT: "[Material/Trade] - [Phase]" (e.g., "Plumbing - Rough-in", "Paint - Prime", "Paint - Finish Coat")
 
 RULES:
-1. Order tasks logically (site work before foundation, rough-in before finishes, etc.)
-2. Estimate durations based on typical residential/commercial construction
-3. Set dependencies - a task should depend on tasks that must complete first
-4. Combine related small items into single tasks when logical
-5. Duration estimates should be in WORKDAYS (not calendar days)
-6. Be conservative - slightly over-estimate rather than under-estimate
+1. ALWAYS break down items into multiple realistic phases - never leave a single generic task
+2. Order tasks logically (demo → rough-in → finishes → punch)
+3. Set dependencies accurately - a task depends on what must complete first
+4. Duration estimates in WORKDAYS (not calendar days)
+5. Be conservative - slightly over-estimate rather than under-estimate
 
-TYPICAL DURATIONS (adjust based on scope):
-- Demo: 2-5 days
-- Site prep: 3-7 days
-- Foundation: 5-10 days
-- Framing: 10-20 days
-- Rough plumbing/electrical: 5-10 days each
-- Insulation: 2-5 days
-- Drywall: 5-10 days
-- Paint: 5-10 days
-- Tile: 5-10 days
-- Finish work: 5-15 days
-- Final cleanup: 2-3 days`;
+COMMON PHASE BREAKDOWNS:
+- Demo: Protection/Prep, Demo, Haul-off
+- Framing: Layout, Walls, Headers/Beams, Blocking, Sheathing
+- Plumbing: Rough-in, Top-out, Trim, Finals
+- Electrical: Rough-in, Low Voltage, Trim, Finals/Testing
+- HVAC: Rough-in, Equipment Set, Trim, Start-up/Balance
+- Drywall: Hang, Tape/Mud, Texture, Touch-up
+- Paint: Prep/Prime, Paint Walls, Paint Trim, Touch-up
+- Flooring: Prep/Level, Install, Transitions/Trim
+- Tile: Waterproofing, Layout, Install, Grout, Seal
+- Cabinets: Receive/Stage, Install Base, Install Upper, Hardware
+- Countertops: Template, Fabricate, Install, Seal
+- Appliances: Receive, Set, Connect, Test`;
 
   const itemsList = lineItems
     .map((item, i) => `${i + 1}. [${item.trade}] ${item.text}`)
@@ -181,14 +189,14 @@ TYPICAL DURATIONS (adjust based on scope):
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: systemPrompt,
     tools: [GENERATE_SCHEDULE_TOOL],
     tool_choice: { type: 'tool', name: 'generate_schedule' },
     messages: [
       {
         role: 'user',
-        content: `Generate a construction schedule for these confirmed line items:\n\n${itemsList}`,
+        content: `Generate a DETAILED construction schedule for these scope items. Break down EVERY item into multiple sub-tasks with realistic phases (e.g., Stone becomes: Templates, Fabricate, Install, Seal).\n\nScope Items:\n${itemsList}`,
       },
     ],
   });
