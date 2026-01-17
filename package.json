@@ -1,0 +1,32 @@
+{
+  "name": "fieldvision-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@clerk/nextjs": "^6.36.7",
+    "@hello-pangea/dnd": "^18.0.1",
+    "@supabase/supabase-js": "^2.90.1",
+    "@types/node": "^25.0.8",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "@vercel/blob": "^2.0.0",
+    "ai": "^6.0.38",
+    "autoprefixer": "^10.4.23",
+    "date-fns": "^4.1.0",
+    "next": "^14.2.35",
+    "postcss": "^8.5.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-dropzone": "^14.3.8",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "uuid": "^13.0.0"
+  }
+}
