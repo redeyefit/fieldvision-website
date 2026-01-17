@@ -38,10 +38,15 @@ export default function SchedulePage() {
 
   const handlePDFUpload = useCallback(async (file: File, text: string) => {
     // Create project first if one doesn't exist
-    if (!project) {
-      await createProject('Untitled Project');
+    let projectId = project?.id;
+    if (!projectId) {
+      projectId = await createProject('Untitled Project');
+      if (!projectId) {
+        console.error('Failed to create project');
+        return;
+      }
     }
-    await parsePDF(file, text);
+    await parsePDF(file, text, projectId);
   }, [project, createProject, parsePDF]);
 
   const handleGenerateSchedule = useCallback(async () => {

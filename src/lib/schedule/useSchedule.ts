@@ -138,8 +138,9 @@ export function useSchedule(projectId?: string) {
   }, [state.project]);
 
   // Parse PDF
-  const parsePDF = useCallback(async (file: File, text: string) => {
-    if (!state.project) return;
+  const parsePDF = useCallback(async (file: File, text: string, projectId?: string) => {
+    const pid = projectId || state.project?.id;
+    if (!pid) return;
 
     setState((s) => ({ ...s, status: 'loading', error: null }));
 
@@ -154,7 +155,7 @@ export function useSchedule(projectId?: string) {
         headers['x-anonymous-id'] = anonymousId;
       }
 
-      const response = await fetch(`/api/schedule/${state.project.id}/parse`, {
+      const response = await fetch(`/api/schedule/${pid}/parse`, {
         method: 'POST',
         headers,
         body: formData,
