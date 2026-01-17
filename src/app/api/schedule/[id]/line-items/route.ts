@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
 
 // Helper to verify project ownership
@@ -30,7 +29,8 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { userId } = await auth();
+    // TODO: Add Clerk auth when ready for user accounts
+    const userId = null; // Disabled for MVP
     const anonymousId = request.headers.get('x-anonymous-id');
 
     if (!userId && !anonymousId) {
@@ -94,7 +94,8 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { userId } = await auth();
+    // TODO: Add Clerk auth when ready for user accounts
+    const userId = null; // Disabled for MVP
     const anonymousId = request.headers.get('x-anonymous-id');
 
     if (!userId && !anonymousId) {

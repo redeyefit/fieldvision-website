@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { createServerClient, generateAnonymousId, verifyAnonymousId } from '@/lib/supabase/client';
 import { Project, CreateProjectRequest } from '@/lib/supabase/types';
 
 // GET /api/schedule - List user's projects
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    // TODO: Add Clerk auth when ready for user accounts
+    const userId = null; // Disabled for MVP
     const anonymousId = request.headers.get('x-anonymous-id');
 
     if (!userId && !anonymousId) {
@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
 // POST /api/schedule - Create new project
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    // TODO: Add Clerk auth when ready for user accounts
+    const userId = null; // Disabled for MVP
     let anonymousId = request.headers.get('x-anonymous-id');
 
     // Generate anonymous ID if not authenticated and none provided

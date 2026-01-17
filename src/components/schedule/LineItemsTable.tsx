@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { LineItem } from '@/lib/supabase/types';
-import { TRADE_CATEGORIES } from '@/lib/ai/anthropic';
+import { TRADE_CATEGORIES } from '@/lib/schedule/trades';
 
 interface LineItemsTableProps {
   items: LineItem[];

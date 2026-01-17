@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
 import { formatCSVDate, formatDuration } from '@/lib/schedule/workdays';
 
@@ -31,7 +30,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { userId } = await auth();
+    // TODO: Add Clerk auth when ready for user accounts
+    const userId = null; // Disabled for MVP
     const anonymousId = request.headers.get('x-anonymous-id');
 
     if (!userId && !anonymousId) {

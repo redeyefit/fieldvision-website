@@ -1,36 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { TRADE_CATEGORIES, TradeCategory } from '@/lib/schedule/trades';
 
-// Initialize Anthropic client
+// Re-export for backwards compatibility with server-side code
+export { TRADE_CATEGORIES };
+export type { TradeCategory };
+
+// Initialize Anthropic client (server-side only)
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-// Trade categories for construction schedules
-export const TRADE_CATEGORIES = [
-  'General Conditions',
-  'Site Work',
-  'Concrete',
-  'Masonry',
-  'Metals',
-  'Wood & Plastics',
-  'Thermal & Moisture',
-  'Doors & Windows',
-  'Finishes',
-  'Specialties',
-  'Equipment',
-  'Furnishings',
-  'Special Construction',
-  'Conveying Systems',
-  'Mechanical',
-  'Electrical',
-  'Plumbing',
-  'HVAC',
-  'Fire Protection',
-  'Demolition',
-  'Cleanup',
-] as const;
-
-export type TradeCategory = (typeof TRADE_CATEGORIES)[number];
 
 // Tool definitions for Claude to use structured output
 const PARSE_PDF_TOOL = {
