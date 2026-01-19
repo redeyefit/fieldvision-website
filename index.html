@@ -60,10 +60,10 @@
         .nav-logo { display: flex; align-items: center; gap: 0.75rem; font-family: var(--font-display); font-weight: 600; font-size: 1.25rem; letter-spacing: -0.02em; }
         .nav-logo-pill { display: flex; align-items: center; justify-content: center; background: #FFFFFF; border-radius: 50%; padding: 0.35rem; }
         .nav-logo-pill img { height: 24px; width: auto; display: block; }
-        .nav-link { font-family: var(--font-display); font-weight: 500; font-size: 0.875rem; color: var(--fv-gray-400); transition: color 0.3s var(--ease-out-expo); }
-        .nav-link:hover { color: var(--fv-blue); }
         .nav-cta { font-family: var(--font-display); font-weight: 500; font-size: 0.875rem; padding: 0.75rem 1.5rem; background: var(--fv-blue); color: var(--fv-white); border-radius: 6px; transition: all 0.3s var(--ease-out-expo); border: 1px solid transparent; }
-        .nav-cta:hover { background: transparent; border-color: var(--fv-blue); box-shadow: 0 0 30px var(--fv-blue-glow); }
+        .nav-cta:hover { background: var(--fv-blue-dark); transform: translateY(-1px); box-shadow: 0 4px 20px var(--fv-blue-glow); }
+        .nav-cta-secondary { font-family: var(--font-display); font-weight: 500; font-size: 0.875rem; padding: 0.75rem 1.5rem; background: transparent; color: var(--fv-white); border-radius: 6px; transition: all 0.3s var(--ease-out-expo); border: 1px solid var(--fv-gray-700); }
+        .nav-cta-secondary:hover { border-color: var(--fv-blue); color: var(--fv-blue); }
 
         /* Hero */
         .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 6rem 2rem; position: relative; }
@@ -222,9 +222,9 @@
             <div class="nav-logo-pill"><img src="logo_backup.png" alt="FieldVision"></div>
             <span>FieldVision AI</span>
         </a>
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <a href="https://schedule.getfieldvision.ai/schedule" class="nav-link">Schedule Maker</a>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
             <a href="https://apps.apple.com/us/app/fieldvision-ai-construction/id6756640990" class="nav-cta" target="_blank">Download Free</a>
+            <a href="https://schedule.getfieldvision.ai/schedule" class="nav-cta-secondary">Schedule Maker</a>
         </div>
     </nav>
 
