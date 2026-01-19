@@ -352,7 +352,7 @@ export default function Home() {
               Support
             </a>
           </div>
-          <p className="text-sm text-gray-500">© 2026 FieldVision AI. All rights reserved.</p>
+          <p className="text-sm text-gray-500">© 2026 MyndAIX Inc.</p>
         </div>
       </footer>
     </>
