@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, Suspense, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useSchedule } from '@/lib/schedule/useSchedule';
 import { PDFUploader } from '@/components/schedule/PDFUploader';
 import { LineItemsTable } from '@/components/schedule/LineItemsTable';
@@ -8,7 +9,34 @@ import { ScheduleTable } from '@/components/schedule/ScheduleTable';
 import { GanttBars } from '@/components/schedule/GanttBars';
 import { AskTheField } from '@/components/schedule/AskTheField';
 
+// Wrapper to handle Suspense for useSearchParams
 export default function SchedulePage() {
+  return (
+    <Suspense fallback={<ScheduleLoadingFallback />}>
+      <SchedulePageContent />
+    </Suspense>
+  );
+}
+
+function ScheduleLoadingFallback() {
+  return (
+    <div className="min-h-screen bg-fv-black text-white flex items-center justify-center">
+      <div className="flex items-center gap-3">
+        <svg className="animate-spin w-6 h-6 text-fv-blue" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <span>Loading Schedule Maker...</span>
+      </div>
+    </div>
+  );
+}
+
+function SchedulePageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const projectIdFromUrl = searchParams.get('id');
+
   const {
     project,
     lineItems,
@@ -25,7 +53,14 @@ export default function SchedulePage() {
     updateTasks,
     exportCSV,
     askTheField,
-  } = useSchedule();
+  } = useSchedule(projectIdFromUrl || undefined);
+
+  // Update URL when project is created/loaded
+  useEffect(() => {
+    if (project?.id && project.id !== projectIdFromUrl) {
+      router.replace(`/schedule?id=${project.id}`, { scroll: false });
+    }
+  }, [project?.id, projectIdFromUrl, router]);
 
   const isLoading = status === 'loading' || status === 'saving';
 
@@ -35,6 +70,53 @@ export default function SchedulePage() {
     return today.toISOString().split('T')[0];
   });
   const [workDays, setWorkDays] = useState<'mon-fri' | 'mon-sat'>('mon-fri');
+
+  // Resizable split between schedule and Gantt (0 = all schedule, 1 = all Gantt)
+  const [splitRatio, setSplitRatio] = useState(0.5); // Default 50/50
+  const isDraggingRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingRef.current = true;
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current || !containerRef.current) return;
+
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const dividerHeight = 12; // h-3 = 12px
+      const availableHeight = containerRect.height - dividerHeight;
+
+      // Calculate where the mouse is relative to the container
+      const mouseY = e.clientY - containerRect.top;
+      const scheduleHeight = mouseY;
+
+      // Calculate ratio (how much of the space goes to Gantt)
+      const newRatio = 1 - (scheduleHeight / availableHeight);
+
+      // Clamp between 0.1 (10% Gantt) and 0.9 (90% Gantt)
+      setSplitRatio(Math.max(0.1, Math.min(0.9, newRatio)));
+    };
+
+    const handleMouseUp = () => {
+      isDraggingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   const handlePDFUpload = useCallback(async (file: File, text: string) => {
     // Create project first if one doesn't exist
@@ -218,9 +300,12 @@ export default function SchedulePage() {
         </div>
 
         {/* Right Pane - Schedule Editor */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div ref={containerRef} className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Schedule Table Area */}
-          <div className="flex-1 p-6 overflow-hidden">
+          <div
+            className="p-6 overflow-hidden"
+            style={{ flex: `${1 - splitRatio} 1 0%`, minHeight: '10%' }}
+          >
             <div className="bg-fv-gray-900 rounded-lg h-full flex flex-col overflow-hidden">
               <ScheduleTable
                 tasks={tasks}
@@ -232,8 +317,19 @@ export default function SchedulePage() {
             </div>
           </div>
 
-          {/* Gantt Preview Area */}
-          <div className="h-56 border-t border-fv-gray-800 p-4">
+          {/* Resizable Divider */}
+          <div
+            onMouseDownCapture={handleDividerMouseDown}
+            className="h-3 bg-fv-gray-800 hover:bg-fv-blue cursor-ns-resize flex items-center justify-center group transition-colors relative z-20 flex-shrink-0"
+          >
+            <div className="w-12 h-1 bg-fv-gray-600 group-hover:bg-white rounded-full transition-colors" />
+          </div>
+
+          {/* Gantt Preview Area - Resizable */}
+          <div
+            className="p-4 overflow-hidden"
+            style={{ flex: `${splitRatio} 1 0%`, minHeight: '10%' }}
+          >
             <div className="bg-fv-gray-900 rounded-lg h-full overflow-hidden">
               <GanttBars tasks={tasks} />
             </div>

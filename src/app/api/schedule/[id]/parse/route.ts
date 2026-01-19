@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
 import { parseContractPDF } from '@/lib/ai/anthropic';
+import { extractText } from 'unpdf';
 
 // Helper to verify project ownership
 async function verifyProjectOwnership(
@@ -85,17 +86,25 @@ export async function POST(
       console.log('[Dev] Skipping Vercel Blob storage - BLOB_READ_WRITE_TOKEN not set');
     }
 
-    // Extract text from PDF
-    // Note: For production, use a proper PDF parser like pdf-parse
-    // For MVP, we'll extract text client-side and send it
-    const pdfText = formData.get('text') as string;
+    // Extract text from PDF using unpdf (server-side)
+    let pdfText = '';
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const { text, totalPages } = await extractText(arrayBuffer);
+      pdfText = Array.isArray(text) ? text.join('\n') : (text || '');
+      console.log(`[PDF Parse] Extracted ${pdfText.length} characters from ${totalPages} pages`);
+    } catch (pdfError) {
+      console.error('[PDF Parse] Failed to extract text:', pdfError);
+      // Fallback to client-provided text if server-side extraction fails
+      pdfText = formData.get('text') as string || '';
+    }
 
-    if (!pdfText) {
+    if (!pdfText || pdfText.trim().length < 50) {
       return NextResponse.json({
         pdf_url: pdfUrl,
-        message: 'PDF uploaded. Send text content to extract line items.',
+        error: 'Could not extract readable text from PDF. Please ensure it is not a scanned image.',
         line_items: [],
-      });
+      }, { status: 400 });
     }
 
     // Parse with Claude
