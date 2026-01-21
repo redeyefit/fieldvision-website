@@ -71,6 +71,20 @@ function SchedulePageContent() {
   });
   const [workDays, setWorkDays] = useState<'mon-fri' | 'mon-sat'>('mon-fri');
 
+  // Separate state for schedule generation to avoid showing "Generating..." during line item saves
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Local state for project name to prevent glitchy typing
+  const [localName, setLocalName] = useState<string | null>(null);
+
+  // Only initialize localName once when project first loads
+  // After that, user has full control
+  useEffect(() => {
+    if (project?.name && localName === null) {
+      setLocalName(project.name);
+    }
+  }, [project?.name, localName]);
+
   // Resizable split between schedule and Gantt (0 = all schedule, 1 = all Gantt)
   const [splitRatio, setSplitRatio] = useState(0.5); // Default 50/50
   const isDraggingRef = useRef(false);
@@ -137,7 +151,12 @@ function SchedulePageContent() {
       alert('Please confirm at least one line item before generating a schedule.');
       return;
     }
-    await generateSchedule(startDate, workDays);
+    setIsGenerating(true);
+    try {
+      await generateSchedule(startDate, workDays);
+    } finally {
+      setIsGenerating(false);
+    }
   }, [lineItems, startDate, workDays, generateSchedule]);
 
   const handleExport = useCallback(async () => {
@@ -153,8 +172,20 @@ function SchedulePageContent() {
   }, [askTheField]);
 
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    updateProject({ name: e.target.value });
-  }, [updateProject]);
+    setLocalName(e.target.value);
+  }, []);
+
+  const handleNameBlur = useCallback(() => {
+    const currentName = localName ?? '';
+    const nameToSave = currentName.trim() || 'Untitled Project';
+    if (nameToSave !== project?.name) {
+      updateProject({ name: nameToSave });
+    }
+    // If user left it empty, show the default in the input
+    if (!currentName.trim()) {
+      setLocalName('Untitled Project');
+    }
+  }, [localName, project?.name, updateProject]);
 
   // Wrapper to update a single task
   const handleUpdateTask = useCallback((taskId: string, updates: Partial<typeof tasks[0]>) => {
@@ -165,8 +196,85 @@ function SchedulePageContent() {
   }, [tasks, updateTasks]);
 
   const confirmedCount = lineItems.filter((i) => i.confirmed).length;
-  const canGenerate = confirmedCount > 0 && startDate && !isLoading;
+  const canGenerate = confirmedCount > 0 && startDate && !isGenerating;
   const canExport = tasks.length > 0 && !isLoading;
+
+  // Calculate current step
+  const getCurrentStep = () => {
+    if (tasks.length > 0) return 4; // Schedule generated - ready to export
+    if (confirmedCount > 0) return 3; // Items confirmed - ready to generate
+    if (lineItems.length > 0) return 2; // Items extracted - need confirmation
+    if (project?.pdf_url || lineItems.length > 0) return 1; // PDF uploaded
+    return 0; // Start
+  };
+  const currentStep = getCurrentStep();
+
+  const steps = [
+    { num: 1, label: 'Upload', done: lineItems.length > 0 || !!project?.pdf_url },
+    { num: 2, label: 'Review', done: confirmedCount > 0 },
+    { num: 3, label: 'Generate', done: tasks.length > 0 },
+    { num: 4, label: 'Export', done: false },
+  ];
+
+  // Export dropdown state
+  const [exportOpen, setExportOpen] = useState(false);
+
+  const handleExportExcel = useCallback(async () => {
+    if (tasks.length === 0) return;
+    const XLSX = await import('xlsx');
+    const data = tasks.map((task, i) => ({
+      'ID': i + 1,
+      'Task': task.name,
+      'Trade': task.trade || 'General',
+      'Duration (Days)': task.duration_days,
+      'Start': task.start_date,
+      'End': task.end_date,
+      'Depends On': task.depends_on?.map(id => {
+        const idx = tasks.findIndex(t => t.id === id);
+        return idx >= 0 ? idx + 1 : '';
+      }).filter(Boolean).join(', ') || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
+    XLSX.writeFile(wb, `${project?.name || 'schedule'}.xlsx`);
+    setExportOpen(false);
+  }, [tasks, project?.name]);
+
+  const handleExportPDF = useCallback(async () => {
+    if (tasks.length === 0) return;
+    const { jsPDF } = await import('jspdf');
+    const autoTable = (await import('jspdf-autotable')).default;
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(project?.name || 'Construction Schedule', 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 30);
+
+    autoTable(doc, {
+      startY: 38,
+      head: [['#', 'Task', 'Trade', 'Days', 'Start', 'End']],
+      body: tasks.map((task, i) => [
+        i + 1,
+        task.name,
+        task.trade || 'General',
+        task.duration_days,
+        task.start_date,
+        task.end_date,
+      ]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [59, 155, 217] },
+    });
+
+    doc.save(`${project?.name || 'schedule'}.pdf`);
+    setExportOpen(false);
+  }, [tasks, project?.name]);
+
+  const handleExportCSV = useCallback(async () => {
+    await exportCSV();
+    setExportOpen(false);
+  }, [exportCSV]);
 
   return (
     <div className="min-h-screen bg-fv-black text-white flex flex-col">
@@ -183,21 +291,48 @@ function SchedulePageContent() {
           <div className="flex items-center gap-2 ml-6">
             <input
               type="text"
-              value={project?.name || 'Untitled Project'}
+              value={localName ?? ''}
               onChange={handleNameChange}
-              className="bg-transparent border-b border-transparent hover:border-fv-gray-600 focus:border-fv-blue focus:outline-none px-1 py-0.5 text-white font-medium"
+              onBlur={handleNameBlur}
+              placeholder="Untitled Project"
+              className="bg-transparent border-b border-transparent hover:border-fv-gray-600 focus:border-fv-blue focus:outline-none px-1 py-0.5 text-white font-medium placeholder:text-fv-gray-500"
             />
-            <span className={`text-xs px-2 py-0.5 rounded ${
-              project?.id ? 'bg-green-900/50 text-green-400' : 'bg-fv-gray-800 text-fv-gray-400'
-            }`}>
-              {project?.id ? 'Saved' : 'Draft'}
-            </span>
             {isLoading && (
-              <svg className="animate-spin w-4 h-4 text-fv-blue" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
+              <div className="flex items-center gap-1.5 text-xs text-fv-blue">
+                <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span>{status === 'loading' ? 'Loading...' : 'Saving...'}</span>
+              </div>
             )}
+          </div>
+
+          {/* Step Progress */}
+          <div className="flex items-center gap-1 ml-6">
+            {steps.map((step, i) => (
+              <div key={step.num} className="flex items-center">
+                <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  step.done
+                    ? 'bg-green-900/50 text-green-400'
+                    : currentStep === step.num
+                      ? 'bg-fv-blue/20 text-fv-blue'
+                      : 'bg-fv-gray-800 text-fv-gray-500'
+                }`}>
+                  {step.done ? (
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <span className="w-3 text-center">{step.num}</span>
+                  )}
+                  <span>{step.label}</span>
+                </div>
+                {i < steps.length - 1 && (
+                  <div className={`w-4 h-px mx-1 ${step.done ? 'bg-green-400' : 'bg-fv-gray-700'}`} />
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -209,14 +344,53 @@ function SchedulePageContent() {
             </span>
           )}
 
-          {/* Export CSV */}
-          <button
-            onClick={handleExport}
-            className="px-4 py-1.5 bg-fv-blue hover:bg-fv-blue-light text-white text-sm font-medium rounded disabled:opacity-30 disabled:cursor-not-allowed"
-            disabled={!canExport}
-          >
-            Export CSV
-          </button>
+          {/* Export Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setExportOpen(!exportOpen)}
+              className="px-4 py-1.5 bg-fv-blue hover:bg-fv-blue-light text-white text-sm font-medium rounded disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={!canExport}
+            >
+              Export
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {exportOpen && canExport && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setExportOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 w-40 bg-fv-gray-800 border border-fv-gray-700 rounded-lg shadow-lg z-30 py-1">
+                  <button
+                    onClick={handleExportCSV}
+                    className="w-full px-3 py-2 text-left text-sm text-white hover:bg-fv-gray-700 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    CSV (Universal)
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    className="w-full px-3 py-2 text-left text-sm text-white hover:bg-fv-gray-700 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2zM14 3.5L18.5 8H14V3.5zM8 17l2-4-2-4h1.5l1.25 2.5L12 9h1.5l-2 4 2 4H12l-1.25-2.5L9.5 17H8z"/>
+                    </svg>
+                    Excel (.xlsx)
+                  </button>
+                  <button
+                    onClick={handleExportPDF}
+                    className="w-full px-3 py-2 text-left text-sm text-white hover:bg-fv-gray-700 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2zM14 3.5L18.5 8H14V3.5zM10.5 11c.83 0 1.5.67 1.5 1.5v1c0 .83-.67 1.5-1.5 1.5H9v2H7.5v-6h3zm4.5 0c.83 0 1.5.67 1.5 1.5v3c0 .83-.67 1.5-1.5 1.5h-2.5v-6H15zm-6 1.5v1.5h1c.28 0 .5-.22.5-.5v-.5c0-.28-.22-.5-.5-.5H9zm4.5 0v3h1c.28 0 .5-.22.5-.5v-2c0-.28-.22-.5-.5-.5h-1z"/>
+                    </svg>
+                    PDF
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -277,7 +451,7 @@ function SchedulePageContent() {
                 className="w-full py-2.5 bg-fv-blue hover:bg-fv-blue-light text-white font-medium rounded disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 disabled={!canGenerate}
               >
-                {isLoading ? (
+                {isGenerating ? (
                   <>
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -301,10 +475,10 @@ function SchedulePageContent() {
 
         {/* Right Pane - Schedule Editor */}
         <div ref={containerRef} className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Schedule Table Area */}
+          {/* Schedule Table Area - explicit height to prevent content from affecting split */}
           <div
-            className="p-6 overflow-hidden"
-            style={{ flex: `${1 - splitRatio} 1 0%`, minHeight: '10%' }}
+            className="p-6 overflow-hidden flex-shrink-0"
+            style={{ height: `calc(${(1 - splitRatio) * 100}% - 6px)` }}
           >
             <div className="bg-fv-gray-900 rounded-lg h-full flex flex-col overflow-hidden">
               <ScheduleTable
@@ -325,10 +499,10 @@ function SchedulePageContent() {
             <div className="w-12 h-1 bg-fv-gray-600 group-hover:bg-white rounded-full transition-colors" />
           </div>
 
-          {/* Gantt Preview Area - Resizable */}
+          {/* Gantt Preview Area - explicit height to prevent content from affecting split */}
           <div
-            className="p-4 overflow-hidden"
-            style={{ flex: `${splitRatio} 1 0%`, minHeight: '10%' }}
+            className="p-4 overflow-hidden flex-shrink-0"
+            style={{ height: `calc(${splitRatio * 100}% - 6px)` }}
           >
             <div className="bg-fv-gray-900 rounded-lg h-full overflow-hidden">
               <GanttBars tasks={tasks} />

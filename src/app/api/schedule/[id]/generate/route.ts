@@ -4,6 +4,9 @@ import { generateSchedule } from '@/lib/ai/anthropic';
 import { recalculateTasks } from '@/lib/schedule/workdays';
 import { v4 as uuidv4 } from 'uuid';
 
+// Allow longer timeout for schedule generation with Claude (Vercel Hobby: max 60s)
+export const maxDuration = 60;
+
 // Helper to verify project ownership
 async function verifyProjectOwnership(
   supabase: ReturnType<typeof createServerClient>,

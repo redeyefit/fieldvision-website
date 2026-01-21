@@ -3,6 +3,9 @@ import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
 import { parseContractPDF } from '@/lib/ai/anthropic';
 import { extractText } from 'unpdf';
 
+// Allow longer timeout for PDF parsing with Claude (Vercel Hobby: max 60s)
+export const maxDuration = 60;
+
 // Helper to verify project ownership
 async function verifyProjectOwnership(
   supabase: ReturnType<typeof createServerClient>,
