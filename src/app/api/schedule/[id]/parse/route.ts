@@ -91,6 +91,8 @@ export async function POST(
 
     // Extract text from PDF using unpdf (server-side)
     let pdfText = '';
+    const clientText = formData.get('text') as string || '';
+
     try {
       const arrayBuffer = await file.arrayBuffer();
       const { text, totalPages } = await extractText(arrayBuffer);
@@ -98,8 +100,12 @@ export async function POST(
       console.log(`[PDF Parse] Extracted ${pdfText.length} characters from ${totalPages} pages`);
     } catch (pdfError) {
       console.error('[PDF Parse] Failed to extract text:', pdfError);
-      // Fallback to client-provided text if server-side extraction fails
-      pdfText = formData.get('text') as string || '';
+    }
+
+    // Use client-provided text if server extraction failed or returned minimal text
+    if (pdfText.trim().length < 50 && clientText.trim().length >= 50) {
+      console.log(`[PDF Parse] Using client-provided text (${clientText.length} chars) instead of server extraction (${pdfText.length} chars)`);
+      pdfText = clientText;
     }
 
     if (!pdfText || pdfText.trim().length < 50) {
