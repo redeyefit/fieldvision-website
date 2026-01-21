@@ -6,6 +6,24 @@ import { extractText } from 'unpdf';
 // Allow longer timeout for PDF parsing with Claude (Vercel Hobby: max 60s)
 export const maxDuration = 60;
 
+// CORS headers helper
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, x-anonymous-id',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+// Handle OPTIONS for CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders(),
+  });
+}
+
 // Helper to verify project ownership
 async function verifyProjectOwnership(
   supabase: ReturnType<typeof createServerClient>,
@@ -161,10 +179,14 @@ export async function POST(
           .eq('project_id', id)
           .order('created_at');
 
-        return NextResponse.json({
+        const response = NextResponse.json({
           pdf_url: pdfUrl,
           line_items: lineItems || [],
         });
+        Object.entries(corsHeaders()).forEach(([key, value]) => {
+          response.headers.set(key, value);
+        });
+        return response;
       } catch (err) {
         lastError = err as Error;
         console.error(`[Parse] Attempt failed:`, lastError.message);
@@ -177,13 +199,21 @@ export async function POST(
     }
 
     console.error('[Parse] Claude API failed after all retries:', lastError?.message, lastError?.stack);
-    return NextResponse.json(
+    const errorResponse = NextResponse.json(
       { error: `Failed to parse PDF: ${lastError?.message || 'Unknown error'}. Please try again.` },
       { status: 500 }
     );
+    Object.entries(corsHeaders()).forEach(([key, value]) => {
+      errorResponse.headers.set(key, value);
+    });
+    return errorResponse;
   } catch (error) {
     const err = error as Error;
     console.error('[Parse] API error:', err.message, err.stack);
-    return NextResponse.json({ error: `Internal server error: ${err.message}` }, { status: 500 });
+    const errorResponse = NextResponse.json({ error: `Internal server error: ${err.message}` }, { status: 500 });
+    Object.entries(corsHeaders()).forEach(([key, value]) => {
+      errorResponse.headers.set(key, value);
+    });
+    return errorResponse;
   }
 }

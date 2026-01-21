@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, generateAnonymousId, verifyAnonymousId } from '@/lib/supabase/client';
 import { Project, CreateProjectRequest } from '@/lib/supabase/types';
 
+// CORS headers helper
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, x-anonymous-id',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+// Handle OPTIONS for CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders(),
+  });
+}
+
 // GET /api/schedule - List user's projects
 export async function GET(request: NextRequest) {
   try {
