@@ -111,16 +111,24 @@ export async function POST(
     let retries = 3;
     let lastError: Error | null = null;
 
+    console.log('[Parse] Starting Claude parsing, text length:', pdfText.length);
+    console.log('[Parse] ANTHROPIC_API_KEY set:', !!process.env.ANTHROPIC_API_KEY);
+
     while (retries > 0) {
       try {
+        console.log(`[Parse] Attempt ${4 - retries} of 3`);
         const result = await parseContractPDF(pdfText);
+
+        // Validate result structure
+        const extractedItems = result?.line_items ?? [];
+        console.log(`[Parse] Extracted ${extractedItems.length} line items`);
 
         // Delete existing line items for this project
         await supabase.from('line_items').delete().eq('project_id', id);
 
         // Insert new line items
-        if (result.line_items.length > 0) {
-          const lineItemsToInsert = result.line_items.map((item) => ({
+        if (extractedItems.length > 0) {
+          const lineItemsToInsert = extractedItems.map((item) => ({
             project_id: id,
             text: item.text,
             trade: item.trade,
@@ -150,6 +158,7 @@ export async function POST(
         });
       } catch (err) {
         lastError = err as Error;
+        console.error(`[Parse] Attempt failed:`, lastError.message);
         retries--;
         if (retries > 0) {
           // Exponential backoff
@@ -158,13 +167,14 @@ export async function POST(
       }
     }
 
-    console.error('Claude API failed after retries:', lastError);
+    console.error('[Parse] Claude API failed after all retries:', lastError?.message, lastError?.stack);
     return NextResponse.json(
-      { error: 'Failed to parse PDF. Please try again.' },
+      { error: `Failed to parse PDF: ${lastError?.message || 'Unknown error'}. Please try again.` },
       { status: 500 }
     );
   } catch (error) {
-    console.error('API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const err = error as Error;
+    console.error('[Parse] API error:', err.message, err.stack);
+    return NextResponse.json({ error: `Internal server error: ${err.message}` }, { status: 500 });
   }
 }

@@ -6,8 +6,12 @@ export { TRADE_CATEGORIES };
 export type { TradeCategory };
 
 // Initialize Anthropic client (server-side only)
+const apiKey = process.env.ANTHROPIC_API_KEY;
+if (!apiKey) {
+  console.error('[Anthropic] WARNING: ANTHROPIC_API_KEY is not set!');
+}
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: apiKey,
 });
 
 // Tool definitions for Claude to use structured output
@@ -110,6 +114,7 @@ export async function parseContractPDF(
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4096,
+    temperature: 0, // Deterministic output - same PDF should extract same items
     system: systemPrompt,
     tools: [PARSE_PDF_TOOL],
     tool_choice: { type: 'tool', name: 'extract_line_items' },
@@ -190,6 +195,7 @@ COMMON PHASE BREAKDOWNS:
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 8192,
+    temperature: 0, // Deterministic output - same contract should produce same schedule
     system: systemPrompt,
     tools: [GENERATE_SCHEDULE_TOOL],
     tool_choice: { type: 'tool', name: 'generate_schedule' },
