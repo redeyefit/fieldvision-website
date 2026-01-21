@@ -137,58 +137,82 @@ export function useSchedule(projectId?: string) {
     }
   }, [state.project]);
 
-  // Parse PDF
+  // Parse PDF with retry logic for network interruptions
   const parsePDF = useCallback(async (file: File, text: string, projectId?: string) => {
     const pid = projectId || state.project?.id;
     if (!pid) return;
 
     setState((s) => ({ ...s, status: 'loading', error: null }));
 
-    try {
-      const formData = new FormData();
-      formData.append('pdf', file);
-      formData.append('text', text);
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-      const anonymousId = getAnonymousId();
-      const headers: HeadersInit = {};
-      if (anonymousId) {
-        headers['x-anonymous-id'] = anonymousId;
-      }
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const formData = new FormData();
+        formData.append('pdf', file);
+        formData.append('text', text);
 
-      const response = await fetch(`/api/schedule/${pid}/parse`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
+        const anonymousId = getAnonymousId();
+        const headers: HeadersInit = {};
+        if (anonymousId) {
+          headers['x-anonymous-id'] = anonymousId;
+        }
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Parse failed' }));
-        throw new Error(error.error || 'Parse failed');
-      }
+        const response = await fetch(`/api/schedule/${pid}/parse`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
 
-      const data = await response.json();
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ error: 'Parse failed' }));
+          throw new Error(error.error || 'Parse failed');
+        }
 
-      setState((s) => ({
-        ...s,
-        lineItems: data.line_items,
-        status: 'idle',
-        lastSaved: new Date(),
-      }));
+        const data = await response.json();
 
-      // Update project with PDF URL
-      if (data.pdf_url && state.project) {
         setState((s) => ({
           ...s,
-          project: s.project ? { ...s.project, pdf_url: data.pdf_url } : null,
+          lineItems: data.line_items,
+          status: 'idle',
+          lastSaved: new Date(),
         }));
+
+        // Update project with PDF URL
+        if (data.pdf_url && state.project) {
+          setState((s) => ({
+            ...s,
+            project: s.project ? { ...s.project, pdf_url: data.pdf_url } : null,
+          }));
+        }
+
+        return; // Success - exit the retry loop
+      } catch (err) {
+        lastError = err as Error;
+        const isNetworkError = lastError.message.includes('network') ||
+          lastError.message.includes('Failed to fetch') ||
+          lastError.name === 'TypeError';
+
+        if (isNetworkError && attempt < maxRetries) {
+          // Wait with exponential backoff before retrying
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.log(`[Parse] Network error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Non-network error or max retries reached
+        break;
       }
-    } catch (err) {
-      setState((s) => ({
-        ...s,
-        status: 'error',
-        error: (err as Error).message,
-      }));
     }
+
+    // All retries failed
+    setState((s) => ({
+      ...s,
+      status: 'error',
+      error: lastError?.message || 'Parse failed after multiple attempts',
+    }));
   }, [state.project]);
 
   // Update line items
@@ -224,34 +248,56 @@ export function useSchedule(projectId?: string) {
     await updateLineItems(updatedItems);
   }, [state.lineItems, updateLineItems]);
 
-  // Generate schedule
+  // Generate schedule with retry logic for network interruptions
   const generateSchedule = useCallback(async (startDate?: string, workDays?: 'mon-fri' | 'mon-sat') => {
     if (!state.project) return;
 
     setState((s) => ({ ...s, status: 'loading', error: null }));
 
-    try {
-      const data = await apiFetch(`/api/schedule/${state.project.id}/generate`, {
-        method: 'POST',
-        body: JSON.stringify({
-          start_date: startDate,
-          work_days: workDays,
-        }),
-      });
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-      setState((s) => ({
-        ...s,
-        tasks: data.tasks,
-        status: 'idle',
-        lastSaved: new Date(),
-      }));
-    } catch (err) {
-      setState((s) => ({
-        ...s,
-        status: 'error',
-        error: (err as Error).message,
-      }));
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const data = await apiFetch(`/api/schedule/${state.project.id}/generate`, {
+          method: 'POST',
+          body: JSON.stringify({
+            start_date: startDate,
+            work_days: workDays,
+          }),
+        });
+
+        setState((s) => ({
+          ...s,
+          tasks: data.tasks,
+          status: 'idle',
+          lastSaved: new Date(),
+        }));
+
+        return; // Success - exit the retry loop
+      } catch (err) {
+        lastError = err as Error;
+        const isNetworkError = lastError.message.includes('network') ||
+          lastError.message.includes('Failed to fetch') ||
+          lastError.name === 'TypeError';
+
+        if (isNetworkError && attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.log(`[Generate] Network error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        break;
+      }
     }
+
+    // All retries failed
+    setState((s) => ({
+      ...s,
+      status: 'error',
+      error: lastError?.message || 'Schedule generation failed after multiple attempts',
+    }));
   }, [state.project]);
 
   // Update tasks (with autosave)
