@@ -1,9 +1,9 @@
 {
   "functions": {
-    "src/app/api/schedule/[id]/parse/route.ts": {
+    "app/api/schedule/[id]/parse/route.ts": {
       "maxDuration": 60
     },
-    "src/app/api/schedule/[id]/generate/route.ts": {
+    "app/api/schedule/[id]/generate/route.ts": {
       "maxDuration": 60
     }
   }
