@@ -50,39 +50,64 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const startTime = Date.now();
+  console.log('[Parse] Request started');
+
   try {
     const { id } = await params;
+    console.log(`[Parse] Project ID: ${id}`);
+
     // TODO: Add Clerk auth when ready for user accounts
     const userId = null; // Disabled for MVP
     const anonymousId = request.headers.get('x-anonymous-id');
+    console.log(`[Parse] Anonymous ID present: ${!!anonymousId}`);
 
     if (!userId && !anonymousId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.log('[Parse] No auth - returning 401');
+      const response = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      Object.entries(corsHeaders()).forEach(([key, value]) => response.headers.set(key, value));
+      return response;
     }
 
     const supabase = createServerClient();
+    console.log(`[Parse] Supabase client created at ${Date.now() - startTime}ms`);
 
     // Verify ownership
     const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
+    console.log(`[Parse] Ownership verified: ${isOwner} at ${Date.now() - startTime}ms`);
     if (!isOwner) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      const response = NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      Object.entries(corsHeaders()).forEach(([key, value]) => response.headers.set(key, value));
+      return response;
     }
 
     // Get form data with PDF file
+    console.log(`[Parse] Reading form data at ${Date.now() - startTime}ms`);
     const formData = await request.formData();
+    console.log(`[Parse] Form data read at ${Date.now() - startTime}ms`);
     const file = formData.get('pdf') as File | null;
+    console.log(`[Parse] File: ${file?.name}, size: ${file?.size} bytes`);
 
     if (!file) {
-      return NextResponse.json({ error: 'No PDF file provided' }, { status: 400 });
+      console.log('[Parse] No file in form data');
+      const response = NextResponse.json({ error: 'No PDF file provided' }, { status: 400 });
+      Object.entries(corsHeaders()).forEach(([key, value]) => response.headers.set(key, value));
+      return response;
     }
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
-      return NextResponse.json({ error: 'File must be a PDF' }, { status: 400 });
+      console.log(`[Parse] Invalid file type: ${file.name}`);
+      const response = NextResponse.json({ error: 'File must be a PDF' }, { status: 400 });
+      Object.entries(corsHeaders()).forEach(([key, value]) => response.headers.set(key, value));
+      return response;
     }
 
     // Limit file size (10MB)
     if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 });
+      console.log(`[Parse] File too large: ${file.size} bytes`);
+      const response = NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 });
+      Object.entries(corsHeaders()).forEach(([key, value]) => response.headers.set(key, value));
+      return response;
     }
 
     // Upload to Vercel Blob (if available) or skip for local dev
@@ -121,18 +146,27 @@ export async function POST(
     }
 
     // Use client-provided text if server extraction failed or returned minimal text
-    if (pdfText.trim().length < 50 && clientText.trim().length >= 50) {
-      console.log(`[PDF Parse] Using client-provided text (${clientText.length} chars) instead of server extraction (${pdfText.length} chars)`);
+    const clientTextLen = clientText.trim().length;
+    const serverTextLen = pdfText.trim().length;
+    console.log(`[Parse] Server text: ${serverTextLen} chars, Client text: ${clientTextLen} chars`);
+
+    if (serverTextLen < 50 && clientTextLen >= 50) {
+      console.log(`[Parse] Using client-provided text instead of server extraction`);
       pdfText = clientText;
     }
 
     if (!pdfText || pdfText.trim().length < 50) {
-      return NextResponse.json({
+      console.log(`[Parse] Insufficient text - returning 400. Server: ${serverTextLen}, Client: ${clientTextLen}`);
+      const response = NextResponse.json({
         pdf_url: pdfUrl,
         error: 'Could not extract readable text from PDF. Please ensure it is not a scanned image.',
         line_items: [],
       }, { status: 400 });
+      Object.entries(corsHeaders()).forEach(([key, value]) => response.headers.set(key, value));
+      return response;
     }
+
+    console.log(`[Parse] Text extraction complete at ${Date.now() - startTime}ms`);
 
     // Parse with Claude
     let retries = 3;
