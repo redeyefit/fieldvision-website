@@ -22,6 +22,7 @@
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
     "next": "^14.2.35",
+    "pdfjs-dist": "^4.9.155",
     "postcss": "^8.5.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

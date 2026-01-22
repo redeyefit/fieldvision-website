@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
+import * as pdfjsLib from 'pdfjs-dist';
 
 interface PDFUploaderProps {
   onUpload: (file: File, text: string) => Promise<void>;
@@ -9,62 +10,47 @@ interface PDFUploaderProps {
   pdfUrl?: string | null;
 }
 
-// Note: For production, use pdf-parse or similar library
-// This is a simplified text extraction for MVP
+// Configure pdf.js worker
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+}
+
+// Extract text from PDF using pdf.js
 async function extractTextFromPDF(file: File): Promise<string> {
-  // For MVP, we'll prompt user to paste text if PDF parsing fails
-  // In production, use @react-pdf/renderer or pdf-parse
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-  const arrayBuffer = await file.arrayBuffer();
-  const bytes = new Uint8Array(arrayBuffer);
+    let fullText = '';
+    const numPages = pdf.numPages;
 
-  // Simple text extraction - look for text streams
-  let text = '';
-  let inStream = false;
-  let streamContent = '';
+    console.log(`[PDFUploader] Extracting text from ${numPages} pages`);
 
-  for (let i = 0; i < bytes.length; i++) {
-    const char = String.fromCharCode(bytes[i]);
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
 
-    if (!inStream) {
-      // Look for stream start
-      if (char === 's' &&
-          String.fromCharCode(bytes[i+1]) === 't' &&
-          String.fromCharCode(bytes[i+2]) === 'r' &&
-          String.fromCharCode(bytes[i+3]) === 'e' &&
-          String.fromCharCode(bytes[i+4]) === 'a' &&
-          String.fromCharCode(bytes[i+5]) === 'm') {
-        inStream = true;
-        i += 6;
-        streamContent = '';
-      }
-    } else {
-      // Look for stream end
-      if (char === 'e' &&
-          String.fromCharCode(bytes[i+1]) === 'n' &&
-          String.fromCharCode(bytes[i+2]) === 'd' &&
-          String.fromCharCode(bytes[i+3]) === 's' &&
-          String.fromCharCode(bytes[i+4]) === 't' &&
-          String.fromCharCode(bytes[i+5]) === 'r' &&
-          String.fromCharCode(bytes[i+6]) === 'e' &&
-          String.fromCharCode(bytes[i+7]) === 'a' &&
-          String.fromCharCode(bytes[i+8]) === 'm') {
-        inStream = false;
-        // Extract readable text from stream
-        const readable = streamContent.replace(/[^\x20-\x7E\n\r]/g, ' ').replace(/\s+/g, ' ').trim();
-        if (readable.length > 20) {
-          text += readable + '\n';
-        }
-      } else {
-        streamContent += char;
-      }
+      const pageText = textContent.items
+        .map((item) => {
+          if ('str' in item) {
+            return item.str;
+          }
+          return '';
+        })
+        .join(' ');
+
+      fullText += pageText + '\n\n';
     }
+
+    // Clean up whitespace
+    fullText = fullText.replace(/\s+/g, ' ').trim();
+    console.log(`[PDFUploader] Extracted ${fullText.length} characters from PDF`);
+
+    return fullText;
+  } catch (err) {
+    console.error('[PDFUploader] PDF extraction failed:', err);
+    return '';
   }
-
-  // Clean up extracted text
-  text = text.replace(/\s+/g, ' ').trim();
-
-  return text;
 }
 
 export function PDFUploader({ onUpload, disabled, pdfUrl }: PDFUploaderProps) {
@@ -83,10 +69,13 @@ export function PDFUploader({ onUpload, disabled, pdfUrl }: PDFUploaderProps) {
 
       if (!extractedText) {
         extractedText = await extractTextFromPDF(file);
+        console.log(`[PDFUploader] Client extracted ${extractedText.length} chars`);
+        console.log(`[PDFUploader] Text preview: ${extractedText.substring(0, 500)}`);
       }
 
       // If we couldn't extract much text, prompt for manual input
       if (extractedText.length < 100) {
+        console.log('[PDFUploader] Insufficient text, showing manual input');
         setSelectedFile(file);
         setShowManualInput(true);
         setIsUploading(false);
@@ -95,6 +84,7 @@ export function PDFUploader({ onUpload, disabled, pdfUrl }: PDFUploaderProps) {
 
       await onUpload(file, extractedText);
     } catch (err) {
+      console.error('[PDFUploader] Error:', err);
       setError((err as Error).message);
     } finally {
       setIsUploading(false);

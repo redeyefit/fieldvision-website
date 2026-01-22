@@ -109,37 +109,62 @@ export async function parseContractPDF(
     unit?: string;
   }>;
 }> {
+  console.log('[Anthropic] parseContractPDF called, text length:', pdfText.length);
+  console.log('[Anthropic] Text preview:', pdfText.substring(0, 500));
+
   const systemPrompt = `You are a construction contract analyst. Extract all scope items, work items, and deliverables from the contract text. Categorize each by trade. Be thorough - include all work mentioned. Ignore pricing, terms, and conditions - focus only on WORK to be performed.`;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
-    temperature: 0, // Deterministic output - same PDF should extract same items
-    system: systemPrompt,
-    tools: [PARSE_PDF_TOOL],
-    tool_choice: { type: 'tool', name: 'extract_line_items' },
-    messages: [
-      {
-        role: 'user',
-        content: `Extract all construction line items from this contract:\n\n${pdfText}`,
-      },
-    ],
-  });
+  console.log('[Anthropic] Calling Claude API with model claude-sonnet-4-20250514');
 
-  // Extract tool use result
-  const toolUse = response.content.find((block) => block.type === 'tool_use');
-  if (!toolUse || toolUse.type !== 'tool_use') {
-    throw new Error('Claude did not return structured line items');
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-haiku-20241022', // Use Haiku for faster response (Sonnet times out on large PDFs)
+      max_tokens: 8192, // Increased from 4096 - complex PDFs need more tokens for full JSON output
+      temperature: 0, // Deterministic output - same PDF should extract same items
+      system: systemPrompt,
+      tools: [PARSE_PDF_TOOL],
+      tool_choice: { type: 'tool', name: 'extract_line_items' },
+      messages: [
+        {
+          role: 'user',
+          content: `Extract all construction line items from this contract:\n\n${pdfText}`,
+        },
+      ],
+    });
+
+    console.log('[Anthropic] Response received, stop_reason:', response.stop_reason);
+    console.log('[Anthropic] Response content types:', response.content.map(b => b.type));
+    console.log('[Anthropic] Full response:', JSON.stringify(response, null, 2).substring(0, 2000));
+
+    // Extract tool use result
+    const toolUse = response.content.find((block) => block.type === 'tool_use');
+    if (!toolUse || toolUse.type !== 'tool_use') {
+      console.error('[Anthropic] No tool_use block found in response');
+      throw new Error('Claude did not return structured line items');
+    }
+
+    console.log('[Anthropic] Tool use found:', toolUse.name);
+    console.log('[Anthropic] Tool input:', JSON.stringify(toolUse.input).substring(0, 1000));
+
+    const result = toolUse.input as {
+      line_items: Array<{
+        text: string;
+        trade: string;
+        quantity?: number;
+        unit?: string;
+      }>;
+    };
+
+    console.log('[Anthropic] Extracted', result.line_items?.length || 0, 'line items');
+    if (result.line_items?.length > 0) {
+      console.log('[Anthropic] First item:', JSON.stringify(result.line_items[0]));
+    }
+
+    return result;
+  } catch (error) {
+    console.error('[Anthropic] API error:', error);
+    throw error;
   }
-
-  return toolUse.input as {
-    line_items: Array<{
-      text: string;
-      trade: string;
-      quantity?: number;
-      unit?: string;
-    }>;
-  };
 }
 
 /**
@@ -193,7 +218,7 @@ COMMON PHASE BREAKDOWNS:
     .join('\n');
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-3-5-haiku-20241022', // Use Haiku for faster response within Vercel timeout
     max_tokens: 8192,
     temperature: 0, // Deterministic output - same contract should produce same schedule
     system: systemPrompt,
@@ -250,7 +275,7 @@ ${context.tasks.map((t, i) => `${i + 1}. ${t.name} (${t.trade}) - ${t.duration_d
 Be concise and practical. Speak like an experienced superintendent.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-3-5-haiku-20241022', // Use Haiku for faster response within Vercel timeout
     max_tokens: 1024,
     system: systemPrompt,
     messages: [

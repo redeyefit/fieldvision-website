@@ -167,6 +167,7 @@ export async function POST(
     }
 
     console.log(`[Parse] Text extraction complete at ${Date.now() - startTime}ms`);
+    console.log(`[Parse] Text preview (first 500 chars): ${pdfText.substring(0, 500)}`);
 
     // Parse with Claude
     let retries = 3;
@@ -174,15 +175,21 @@ export async function POST(
 
     console.log('[Parse] Starting Claude parsing, text length:', pdfText.length);
     console.log('[Parse] ANTHROPIC_API_KEY set:', !!process.env.ANTHROPIC_API_KEY);
+    console.log('[Parse] API key prefix:', process.env.ANTHROPIC_API_KEY?.substring(0, 10));
+    console.log('[Parse] Full text being sent to Claude:', pdfText.substring(0, 2000));
 
     while (retries > 0) {
       try {
         console.log(`[Parse] Attempt ${4 - retries} of 3`);
         const result = await parseContractPDF(pdfText);
+        console.log('[Parse] Claude response:', JSON.stringify(result));
 
         // Validate result structure
         const extractedItems = result?.line_items ?? [];
         console.log(`[Parse] Extracted ${extractedItems.length} line items`);
+        if (extractedItems.length > 0) {
+          console.log('[Parse] First item:', JSON.stringify(extractedItems[0]));
+        }
 
         // Delete existing line items for this project
         await supabase.from('line_items').delete().eq('project_id', id);
