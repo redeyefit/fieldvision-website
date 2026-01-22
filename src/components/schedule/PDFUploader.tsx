@@ -73,13 +73,9 @@ export function PDFUploader({ onUpload, disabled, pdfUrl }: PDFUploaderProps) {
         console.log(`[PDFUploader] Text preview: ${extractedText.substring(0, 500)}`);
       }
 
-      // If we couldn't extract much text, prompt for manual input
+      // If client extraction fails, still upload the PDF so the server can parse it.
       if (extractedText.length < 100) {
-        console.log('[PDFUploader] Insufficient text, showing manual input');
-        setSelectedFile(file);
-        setShowManualInput(true);
-        setIsUploading(false);
-        return;
+        console.log('[PDFUploader] Insufficient client text, continuing with server-side parse');
       }
 
       await onUpload(file, extractedText);
