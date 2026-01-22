@@ -118,7 +118,7 @@ export async function parseContractPDF(
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022', // Use Haiku for faster response (Sonnet times out on large PDFs)
+      model: 'claude-sonnet-4-20250514', // Use Sonnet for thorough extraction (121 items vs 25 with Haiku)
       max_tokens: 8192, // Increased from 4096 - complex PDFs need more tokens for full JSON output
       temperature: 0, // Deterministic output - same PDF should extract same items
       system: systemPrompt,
