@@ -474,11 +474,11 @@ function SchedulePageContent() {
         </div>
 
         {/* Right Pane - Schedule Editor */}
-        <div ref={containerRef} className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Schedule Table Area - explicit height to prevent content from affecting split */}
+        <div ref={containerRef} className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+          {/* Schedule Table Area - explicit flex basis to enforce split */}
           <div
-            className="p-6 overflow-hidden flex-shrink-0"
-            style={{ height: `calc(${(1 - splitRatio) * 100}% - 6px)` }}
+            className="p-6 overflow-hidden min-h-0"
+            style={{ flex: `0 0 calc(${(1 - splitRatio) * 100}% - 6px)` }}
           >
             <div className="bg-fv-gray-900 rounded-lg h-full flex flex-col overflow-hidden">
               <ScheduleTable
@@ -499,10 +499,10 @@ function SchedulePageContent() {
             <div className="w-12 h-1 bg-fv-gray-600 group-hover:bg-white rounded-full transition-colors" />
           </div>
 
-          {/* Gantt Preview Area - explicit height to prevent content from affecting split */}
+          {/* Gantt Preview Area - explicit flex basis to enforce split */}
           <div
-            className="p-4 overflow-hidden flex-shrink-0"
-            style={{ height: `calc(${splitRatio * 100}% - 6px)` }}
+            className="p-4 overflow-hidden min-h-0"
+            style={{ flex: `0 0 calc(${splitRatio * 100}% - 6px)` }}
           >
             <div className="bg-fv-gray-900 rounded-lg h-full overflow-hidden">
               <GanttBars tasks={tasks} />
