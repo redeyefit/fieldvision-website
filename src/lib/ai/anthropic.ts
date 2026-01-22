@@ -218,7 +218,7 @@ COMMON PHASE BREAKDOWNS:
     .join('\n');
 
   const response = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022', // Use Haiku for faster response within Vercel timeout
+    model: 'claude-sonnet-4-20250514', // Sonnet for better reasoning on dependencies & durations
     max_tokens: 8192,
     temperature: 0, // Deterministic output - same contract should produce same schedule
     system: systemPrompt,
