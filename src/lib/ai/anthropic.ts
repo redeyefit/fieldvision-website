@@ -275,7 +275,7 @@ ${context.tasks.map((t, i) => `${i + 1}. ${t.name} (${t.trade}) - ${t.duration_d
 Be concise and practical. Speak like an experienced superintendent.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022', // Use Haiku for faster response within Vercel timeout
+    model: 'claude-sonnet-4-20250514', // Sonnet for expert construction reasoning
     max_tokens: 1024,
     system: systemPrompt,
     messages: [
