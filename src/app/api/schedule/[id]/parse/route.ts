@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
-import { parseContractPDF } from '@/lib/ai/anthropic';
+import { parseContractPDFWithGemini } from '@/lib/ai/gemini';
 import { extractText } from 'unpdf';
 
-// Allow longer timeout for PDF parsing with Claude (Vercel Hobby: max 60s)
+// Gemini Flash is fast (~5-10s) but keeping max for safety
 export const maxDuration = 60;
 
 // CORS headers helper
@@ -173,16 +173,15 @@ export async function POST(
     let retries = 3;
     let lastError: Error | null = null;
 
-    console.log('[Parse] Starting Claude parsing, text length:', pdfText.length);
-    console.log('[Parse] ANTHROPIC_API_KEY set:', !!process.env.ANTHROPIC_API_KEY);
-    console.log('[Parse] API key prefix:', process.env.ANTHROPIC_API_KEY?.substring(0, 10));
-    console.log('[Parse] Full text being sent to Claude:', pdfText.substring(0, 2000));
+    console.log('[Parse] Starting Gemini parsing, text length:', pdfText.length);
+    console.log('[Parse] GEMINI_API_KEY set:', !!process.env.GEMINI_API_KEY);
+    console.log('[Parse] Full text being sent to Gemini:', pdfText.substring(0, 2000));
 
     while (retries > 0) {
       try {
         console.log(`[Parse] Attempt ${4 - retries} of 3`);
-        const result = await parseContractPDF(pdfText);
-        console.log('[Parse] Claude response:', JSON.stringify(result));
+        const result = await parseContractPDFWithGemini(pdfText);
+        console.log('[Parse] Gemini response:', JSON.stringify(result));
 
         // Validate result structure
         const extractedItems = result?.line_items ?? [];
@@ -239,7 +238,7 @@ export async function POST(
       }
     }
 
-    console.error('[Parse] Claude API failed after all retries:', lastError?.message, lastError?.stack);
+    console.error('[Parse] Gemini API failed after all retries:', lastError?.message, lastError?.stack);
     const errorResponse = NextResponse.json(
       { error: `Failed to parse PDF: ${lastError?.message || 'Unknown error'}. Please try again.` },
       { status: 500 }
