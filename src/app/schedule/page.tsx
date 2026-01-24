@@ -53,6 +53,7 @@ function SchedulePageContent() {
     updateTasks,
     exportCSV,
     askTheField,
+    askGeneralConstruction,
   } = useSchedule(projectIdFromUrl || undefined);
 
   // Update URL when project is created/loaded
@@ -167,9 +168,13 @@ function SchedulePageContent() {
     }
   }, [exportCSV]);
 
-  const handleAskQuestion = useCallback(async (question: string): Promise<string> => {
+  const handleAskProject = useCallback(async (question: string): Promise<string> => {
     return askTheField(question);
   }, [askTheField]);
+
+  const handleAskGeneral = useCallback(async (question: string): Promise<string> => {
+    return askGeneralConstruction(question);
+  }, [askGeneralConstruction]);
 
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalName(e.target.value);
@@ -513,8 +518,9 @@ function SchedulePageContent() {
           <AskTheField
             isOpen={askFieldOpen}
             onToggle={() => setAskFieldOpen(!askFieldOpen)}
-            onAsk={handleAskQuestion}
-            disabled={isLoading || tasks.length === 0}
+            onAskProject={handleAskProject}
+            onAskGeneral={handleAskGeneral}
+            disabled={isLoading}
           />
         </div>
       </div>

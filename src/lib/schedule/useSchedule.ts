@@ -389,7 +389,7 @@ export function useSchedule(projectId?: string) {
     document.body.removeChild(a);
   }, [state.project]);
 
-  // Ask the Field
+  // Ask the Field (project-specific, uses Claude)
   const askTheField = useCallback(async (question: string): Promise<string> => {
     if (!state.project) return 'No project loaded.';
 
@@ -400,6 +400,16 @@ export function useSchedule(projectId?: string) {
 
     return data.answer;
   }, [state.project]);
+
+  // Ask general construction questions (stateless, uses ChatGPT)
+  const askGeneralConstruction = useCallback(async (question: string): Promise<string> => {
+    const data = await apiFetch('/api/schedule/ask-general', {
+      method: 'POST',
+      body: JSON.stringify({ question }),
+    });
+
+    return data.answer;
+  }, []);
 
   // Load project on mount if ID provided
   useEffect(() => {
@@ -430,5 +440,6 @@ export function useSchedule(projectId?: string) {
     reorderTasks,
     exportCSV,
     askTheField,
+    askGeneralConstruction,
   };
 }

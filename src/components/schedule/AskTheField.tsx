@@ -10,7 +10,8 @@ interface Message {
 interface AskTheFieldProps {
   isOpen: boolean;
   onToggle: () => void;
-  onAsk: (question: string) => Promise<string>;
+  onAskProject: (question: string) => Promise<string>;
+  onAskGeneral: (question: string) => Promise<string>;
   disabled?: boolean;
 }
 
@@ -21,7 +22,7 @@ const PROMPT_CHIPS = [
   { label: 'Best practices', prompt: 'What are best practices for this type of project scheduling?' },
 ];
 
-export function AskTheField({ isOpen, onToggle, onAsk, disabled }: AskTheFieldProps) {
+export function AskTheField({ isOpen, onToggle, onAskProject, onAskGeneral, disabled }: AskTheFieldProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -35,16 +36,17 @@ export function AskTheField({ isOpen, onToggle, onAsk, disabled }: AskTheFieldPr
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const handleSubmit = useCallback(async (question?: string) => {
+  // Ask about this specific project (uses Claude with project context)
+  const handleAskProject = useCallback(async (question?: string) => {
     const q = question || input.trim();
     if (!q || isLoading || disabled) return;
 
     setInput('');
-    setMessages((prev) => [...prev, { role: 'user', content: q }]);
+    setMessages((prev) => [...prev, { role: 'user', content: `[Project] ${q}` }]);
     setIsLoading(true);
 
     try {
-      const answer = await onAsk(q);
+      const answer = await onAskProject(q);
       setMessages((prev) => [...prev, { role: 'assistant', content: answer }]);
     } catch (err) {
       setMessages((prev) => [
@@ -54,7 +56,34 @@ export function AskTheField({ isOpen, onToggle, onAsk, disabled }: AskTheFieldPr
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, disabled, onAsk]);
+  }, [input, isLoading, disabled, onAskProject]);
+
+  // Ask general construction questions (uses ChatGPT, no project context)
+  const handleAskGeneral = useCallback(async (question?: string) => {
+    const q = question || input.trim();
+    if (!q || isLoading || disabled) return;
+
+    setInput('');
+    setMessages((prev) => [...prev, { role: 'user', content: `[General] ${q}` }]);
+    setIsLoading(true);
+
+    try {
+      const answer = await onAskGeneral(q);
+      setMessages((prev) => [...prev, { role: 'assistant', content: answer }]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [input, isLoading, disabled, onAskGeneral]);
+
+  // Legacy handler for prompt chips (defaults to project context)
+  const handleSubmit = useCallback(async (question?: string) => {
+    await handleAskProject(question);
+  }, [handleAskProject]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -160,7 +189,7 @@ export function AskTheField({ isOpen, onToggle, onAsk, disabled }: AskTheFieldPr
 
       {/* Input */}
       <div className="p-4 border-t border-fv-gray-800">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
           <input
             type="text"
             value={input}
@@ -168,17 +197,24 @@ export function AskTheField({ isOpen, onToggle, onAsk, disabled }: AskTheFieldPr
             onKeyDown={handleKeyDown}
             placeholder="Ask a question..."
             disabled={isLoading || disabled}
-            className="flex-1 bg-fv-gray-800 border border-fv-gray-700 rounded px-3 py-2 text-sm text-white placeholder:text-fv-gray-500 focus:border-fv-blue focus:outline-none disabled:opacity-50"
+            className="w-full bg-fv-gray-800 border border-fv-gray-700 rounded px-3 py-2 text-sm text-white placeholder:text-fv-gray-500 focus:border-fv-blue focus:outline-none disabled:opacity-50"
           />
-          <button
-            onClick={() => handleSubmit()}
-            disabled={!input.trim() || isLoading || disabled}
-            className="p-2 bg-fv-blue hover:bg-fv-blue-light text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleAskProject()}
+              disabled={!input.trim() || isLoading || disabled}
+              className="flex-1 px-3 py-2 bg-fv-blue hover:bg-fv-blue-light text-white text-xs font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              This project
+            </button>
+            <button
+              onClick={() => handleAskGeneral()}
+              disabled={!input.trim() || isLoading || disabled}
+              className="flex-1 px-3 py-2 bg-fv-gray-700 hover:bg-fv-gray-600 text-white text-xs font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              General construction
+            </button>
+          </div>
         </div>
       </div>
     </div>

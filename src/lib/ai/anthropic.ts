@@ -168,7 +168,7 @@ export async function parseContractPDF(
 }
 
 /**
- * Generate schedule from confirmed line items
+ * Generate schedule from confirmed line items (legacy - without ChatGPT enrichment)
  * Uses Claude tool_use for structured output
  */
 export async function generateSchedule(
@@ -234,6 +234,123 @@ COMMON PHASE BREAKDOWNS:
       {
         role: 'user',
         content: `Generate a DETAILED construction schedule for these scope items. Break down EVERY item into multiple sub-tasks with realistic phases (e.g., Stone becomes: Templates, Fabricate, Install, Seal).\n\nScope Items:\n${itemsList}`,
+      },
+    ],
+  });
+
+  // Extract tool use result
+  const toolUse = response.content.find((block) => block.type === 'tool_use');
+  if (!toolUse || toolUse.type !== 'tool_use') {
+    throw new Error('Claude did not return structured schedule');
+  }
+
+  return toolUse.input as {
+    tasks: Array<{
+      name: string;
+      trade: string;
+      duration_days: number;
+      depends_on_indices: number[];
+      reasoning?: string;
+    }>;
+  };
+}
+
+// Types for ChatGPT enrichment (imported from openai.ts)
+interface EnrichedPhase {
+  name: string;
+  typical_duration_days: number;
+}
+
+interface EnrichedLineItem {
+  original: string;
+  trade: string;
+  phases: EnrichedPhase[];
+  common_dependencies: string[];
+  notes: string;
+}
+
+interface EnrichmentResult {
+  enriched_items: EnrichedLineItem[];
+  missing_items: string[];
+  warnings: string[];
+}
+
+/**
+ * Generate schedule from ChatGPT-enriched line items
+ * Claude focuses on sequencing and dependencies, trusting ChatGPT's phase breakdowns
+ */
+export async function generateScheduleFromEnriched(
+  enrichment: EnrichmentResult
+): Promise<{
+  tasks: Array<{
+    name: string;
+    trade: string;
+    duration_days: number;
+    depends_on_indices: number[];
+    reasoning?: string;
+  }>;
+}> {
+  const systemPrompt = `You are a construction scheduling expert. You will receive PRE-ENRICHED line items with phase breakdowns and duration estimates from a construction domain expert (ChatGPT).
+
+YOUR FOCUS: Sequencing and dependencies. The phase breakdowns and durations are already provided - your job is to:
+1. Use the provided phases and durations as your starting point
+2. Sequence all phases logically across ALL trades (not just within each trade)
+3. Set accurate dependencies - which phases must complete before others can start
+4. Adjust durations ONLY if the enrichment data seems clearly wrong
+
+SEQUENCING RULES:
+1. Demo and protection always first
+2. Rough-ins (plumbing, electrical, HVAC) after framing, can often run in parallel
+3. Inspections after rough-ins before drywall
+4. Drywall after ALL rough-ins and insulation
+5. Paint after drywall
+6. Cabinets after paint
+7. Countertops after cabinets
+8. Tile can happen alongside drywall/paint depending on location
+9. Flooring near end, after paint
+10. Final connections and testing last
+
+DEPENDENCY LOGIC:
+- If a phase from Trade A must wait for Trade B to complete something, set that dependency
+- Multiple phases can depend on the same predecessor
+- Don't create circular dependencies
+- Phases within the same trade usually depend on each other sequentially
+
+EXCLUDE administrative/overhead items - ONLY physical construction work.
+
+If the enrichment includes warnings about missing items, consider adding them if critical to the schedule.`;
+
+  // Format enriched items for Claude
+  const enrichedDescription = enrichment.enriched_items.map((item, idx) => {
+    const phases = item.phases
+      .map((p) => `  - ${p.name}: ${p.typical_duration_days} days`)
+      .join('\n');
+    const deps = item.common_dependencies.length > 0
+      ? `  Dependencies: ${item.common_dependencies.join(', ')}`
+      : '';
+    const notes = item.notes ? `  Notes: ${item.notes}` : '';
+    return `${idx + 1}. [${item.trade}] ${item.original}\n${phases}${deps ? '\n' + deps : ''}${notes ? '\n' + notes : ''}`;
+  }).join('\n\n');
+
+  const missingWarning = enrichment.missing_items.length > 0
+    ? `\n\nMISSING ITEMS IDENTIFIED:\n${enrichment.missing_items.map((m) => `- ${m}`).join('\n')}`
+    : '';
+
+  const warnings = enrichment.warnings.length > 0
+    ? `\n\nWARNINGS:\n${enrichment.warnings.map((w) => `- ${w}`).join('\n')}`
+    : '';
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 8192,
+    temperature: 0,
+    system: systemPrompt,
+    tools: [GENERATE_SCHEDULE_TOOL],
+    tool_choice: { type: 'tool', name: 'generate_schedule' },
+    messages: [
+      {
+        role: 'user',
+        content: `Generate a construction schedule from these PRE-ENRICHED scope items. Use the provided phase breakdowns and durations. Your job is to SEQUENCE all phases across all trades and SET DEPENDENCIES accurately.\n\nENRICHED SCOPE ITEMS:\n${enrichedDescription}${missingWarning}${warnings}`,
       },
     ],
   });
