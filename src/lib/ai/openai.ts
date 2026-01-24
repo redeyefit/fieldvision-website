@@ -118,6 +118,7 @@ export async function enrichLineItems(
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       temperature: 0,
+      max_tokens: 16384, // Large contracts (132+ items) need more tokens to avoid truncation
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: ENRICHMENT_PROMPT },
