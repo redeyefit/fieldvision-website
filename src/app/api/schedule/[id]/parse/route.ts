@@ -3,7 +3,7 @@ import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
 import { parseContractPDFWithGemini } from '@/lib/ai/gemini';
 import { extractText } from 'unpdf';
 
-// Gemini Flash is fast (~5-10s) but keeping max for safety
+// Claude Sonnet for PDF parsing - allow full 60s for complex contracts
 export const maxDuration = 60;
 
 // CORS headers helper
@@ -175,13 +175,13 @@ export async function POST(
 
     console.log('[Parse] Starting Gemini parsing, text length:', pdfText.length);
     console.log('[Parse] GEMINI_API_KEY set:', !!process.env.GEMINI_API_KEY);
-    console.log('[Parse] Full text being sent to Gemini:', pdfText.substring(0, 2000));
+    console.log('[Parse] Text preview being sent to Gemini:', pdfText.substring(0, 500));
 
     while (retries > 0) {
       try {
         console.log(`[Parse] Attempt ${4 - retries} of 3`);
         const result = await parseContractPDFWithGemini(pdfText);
-        console.log('[Parse] Gemini response:', JSON.stringify(result));
+        console.log('[Parse] Gemini response:', JSON.stringify(result).substring(0, 1000));
 
         // Validate result structure
         const extractedItems = result?.line_items ?? [];
@@ -195,14 +195,22 @@ export async function POST(
 
         // Insert new line items
         if (extractedItems.length > 0) {
-          const lineItemsToInsert = extractedItems.map((item) => ({
-            project_id: id,
-            text: item.text,
-            trade: item.trade,
-            quantity: item.quantity || null,
-            unit: item.unit || null,
-            confirmed: false,
-          }));
+          const lineItemsToInsert = extractedItems.map((item) => {
+            // Sanitize quantity - must be a valid number or null
+            let quantity: number | null = null;
+            if (item.quantity !== null && item.quantity !== undefined) {
+              const parsed = typeof item.quantity === 'number' ? item.quantity : parseFloat(String(item.quantity));
+              quantity = !isNaN(parsed) ? parsed : null;
+            }
+            return {
+              project_id: id,
+              text: item.text,
+              trade: item.trade,
+              quantity,
+              unit: typeof item.unit === 'string' ? item.unit : null,
+              confirmed: false,
+            };
+          });
 
           const { error: insertError } = await supabase.from('line_items').insert(lineItemsToInsert);
 

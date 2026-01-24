@@ -4,7 +4,7 @@ import { generateSchedule } from '@/lib/ai/anthropic';
 import { recalculateTasks } from '@/lib/schedule/workdays';
 import { v4 as uuidv4 } from 'uuid';
 
-// Allow longer timeout for schedule generation with Claude (Vercel Hobby: max 60s)
+// Claude Sonnet takes longer (~15-30s) for better quality schedules
 export const maxDuration = 60;
 
 // Helper to verify project ownership
@@ -82,7 +82,7 @@ export async function POST(
       );
     }
 
-    // Generate schedule with Claude
+    // Generate schedule with Claude Sonnet (better reasoning for construction phasing)
     let retries = 3;
     let lastError: Error | null = null;
 

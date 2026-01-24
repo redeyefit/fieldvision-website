@@ -26,10 +26,13 @@ export function isWorkday(date: Date, workWeek: WorkWeek): boolean {
 
 /**
  * Calculate end date given start date and duration in workdays
- * @param start - Start date
- * @param workdays - Number of workdays
+ * Duration includes the start day, so:
+ * - 1 day task: ends same day as start
+ * - 2 day task: ends 1 workday after start
+ * @param start - Start date (must be a workday)
+ * @param workdays - Number of workdays (including start day)
  * @param workWeek - Work week configuration
- * @returns End date after the specified workdays
+ * @returns End date (last day of the task)
  */
 export function calculateEndDate(
   start: Date | string,
@@ -38,15 +41,17 @@ export function calculateEndDate(
 ): Date {
   const startDate = typeof start === 'string' ? parseISO(start) : start;
   let current = new Date(startDate);
-  let added = 0;
 
-  // Duration of 0 means same-day task
-  if (workdays <= 0) {
+  // Duration of 1 or less means same-day task
+  if (workdays <= 1) {
     return current;
   }
 
-  // Add workdays one at a time
-  while (added < workdays) {
+  // We need to add (workdays - 1) more workdays after the start
+  let added = 0;
+  const toAdd = workdays - 1;
+
+  while (added < toAdd) {
     current = addDays(current, 1);
     if (isWorkday(current, workWeek)) {
       added++;

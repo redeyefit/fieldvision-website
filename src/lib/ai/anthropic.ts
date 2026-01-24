@@ -118,7 +118,7 @@ export async function parseContractPDF(
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022', // Use 3.5 Sonnet - faster than Sonnet 4, more thorough than Haiku
+      model: 'claude-sonnet-4-20250514', // Sonnet 4 - reliable and thorough for contract parsing
       max_tokens: 8192, // Increased from 4096 - complex PDFs need more tokens for full JSON output
       temperature: 0, // Deterministic output - same PDF should extract same items
       system: systemPrompt,
@@ -198,6 +198,12 @@ RULES:
 3. Set dependencies accurately - a task depends on what must complete first
 4. Duration estimates in WORKDAYS (not calendar days)
 5. Be conservative - slightly over-estimate rather than under-estimate
+6. EXCLUDE administrative/overhead items - these are NOT schedulable tasks:
+   - General Conditions (supervision, safety meetings, job site management)
+   - Documentation (daily logs, photo documentation, schedule updates)
+   - Communication (owner meetings, RFIs, submittals)
+   - Permits/Inspections scheduling (just schedule the actual inspection, not tracking)
+   ONLY include actual PHYSICAL CONSTRUCTION WORK that crews perform.
 
 COMMON PHASE BREAKDOWNS:
 - Demo: Protection/Prep, Demo, Haul-off
