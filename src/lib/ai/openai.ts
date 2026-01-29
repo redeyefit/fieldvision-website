@@ -1,14 +1,18 @@
 import OpenAI from 'openai';
 
-// Initialize OpenAI client (server-side only)
-const apiKey = process.env.OPENAI_API_KEY;
-if (!apiKey) {
-  console.error('[OpenAI] WARNING: OPENAI_API_KEY is not set!');
-}
+// Lazy-initialized OpenAI client (prevents build-time errors)
+let openai: OpenAI | null = null;
 
-const openai = new OpenAI({
-  apiKey: apiKey,
-});
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY is not set');
+    }
+    openai = new OpenAI({ apiKey });
+  }
+  return openai;
+}
 
 // Types for enriched line items
 export interface EnrichedPhase {
@@ -115,7 +119,7 @@ export async function enrichLineItems(
   console.log('[OpenAI] enrichLineItems called with', lineItems.length, 'items');
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4o',
       temperature: 0,
       max_tokens: 16384, // Large contracts (132+ items) need more tokens to avoid truncation
@@ -152,7 +156,7 @@ export async function askConstructionExpert(question: string): Promise<string> {
   console.log('[OpenAI] askConstructionExpert called:', question.substring(0, 100));
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4o',
       temperature: 0.3,
       max_tokens: 1024,
