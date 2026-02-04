@@ -1,0 +1,94 @@
+name: floor_plan_extraction
+version: "2.0"
+model_family: vision
+created: 2026-02-01
+preferred_model: gemini
+
+inputs:
+  sheet_number: "${sheet_number}"
+  sheet_title: "${sheet_title}"
+  building_description: "${building_description}"
+  cover_sheet_total_sf: "${cover_sheet_total_sf}"
+
+goal: |
+  Analyze a construction floor plan blueprint image and extract all rooms with their
+  exact labels and measurements. Return ONLY verified, visible information in strict JSON.
+
+context: |
+  You are analyzing a REAL construction floor plan blueprint image.
+  This sheet is part of a multi-sheet set for the SAME building project.
+  DO NOT make up room names - read the ACTUAL labels on the blueprint.
+
+constraints:
+  - Read the actual blueprint image - do not make up or estimate data
+  - Use EXACT room labels as written on the blueprint (e.g., "OFFICE/GUEST ROOM" not "BEDROOM")
+  - Use labeled square footages when visible (e.g., "398 sq.ft." means area is 398)
+  - If a measurement is unclear, omit it or mark as null - do not guess
+  - Include ALL rooms, even small bathrooms and closets
+  - Return JSON only - no markdown code blocks, no explanations
+
+instructions:
+  - step: "Scale Detection"
+    action: "Find drawing scale in title block (e.g., '1/4\" = 1'-0\"'). Set scaleConfidence."
+
+  - step: "Room Extraction"
+    action: "Scan entire plan for room labels. Read EXACT text. Include all rooms."
+
+  - step: "Area Extraction"
+    action: "For each room, look for labeled area (e.g., '398 sq.ft.'). Use that exact value."
+
+  - step: "Validation"
+    action: "Verify no hallucinated names. Every room must have visible label on plan."
+
+output_schema:
+  type: object
+  required: [rooms, summary]
+  properties:
+    scale:
+      type: string
+      description: "Drawing scale if found (e.g., '1/4\" = 1'-0\"')"
+    scaleConfidence:
+      type: string
+      enum: [high, medium, low]
+    floors:
+      type: array
+      items:
+        type: object
+        properties:
+          name: { type: string }
+          area: { type: number, nullable: true }
+          roomCount: { type: integer }
+    rooms:
+      type: array
+      items:
+        type: object
+        required: [name, floor, roomType]
+        properties:
+          name: { type: string, description: "EXACT room label from blueprint" }
+          floor: { type: string }
+          area: { type: number, description: "Labeled sq ft or calculated" }
+          width: { type: number, nullable: true }
+          length: { type: number, nullable: true }
+          roomType: { type: string }
+          applicableDetails: { type: array, items: { type: string } }
+    totalArea:
+      type: number
+      nullable: true
+    summary:
+      type: string
+
+adapter_overrides:
+  claude:
+    add_step_by_step: true
+    anti_hallucination_emphasis: strong
+    system_role: "You are a precise construction document analyst."
+    output_constraint: strict
+
+  gemini:
+    prompt_length: concise
+    multimodal_instruction: explicit
+    emphasis: "READ labels, don't invent them"
+
+  openai:
+    output_format_enforcement: json_mode
+    system_prompt_style: directive

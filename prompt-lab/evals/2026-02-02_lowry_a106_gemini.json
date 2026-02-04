@@ -1,0 +1,83 @@
+{
+  "test_id": "lowry_a106",
+  "model": "gemini",
+  "schema_version": "2.0",
+  "timestamp": "2026-02-02T06:35:10.944Z",
+  "passed": true,
+  "scores": {
+    "room_count_match": true,
+    "room_names_correct": 1,
+    "areas_correct": 1,
+    "overall": 1
+  },
+  "failures": [],
+  "raw_output": {
+    "scale": "1'-0\" = 1/4\"",
+    "scaleConfidence": "high",
+    "floors": [
+      {
+        "name": "Floor 00",
+        "area": null,
+        "roomCount": 6
+      }
+    ],
+    "rooms": [
+      {
+        "name": "LIVING ROOM",
+        "floor": "Floor 00",
+        "area": 398,
+        "width": null,
+        "length": null,
+        "roomType": "Living",
+        "applicableDetails": []
+      },
+      {
+        "name": "DINING",
+        "floor": "Floor 00",
+        "area": 196,
+        "width": null,
+        "length": null,
+        "roomType": "Dining",
+        "applicableDetails": []
+      },
+      {
+        "name": "KITCHEN",
+        "floor": "Floor 00",
+        "area": 151,
+        "width": null,
+        "length": null,
+        "roomType": "Kitchen",
+        "applicableDetails": []
+      },
+      {
+        "name": "OFFICE/GUEST ROOM",
+        "floor": "Floor 00",
+        "area": 117,
+        "width": null,
+        "length": null,
+        "roomType": "Office",
+        "applicableDetails": []
+      },
+      {
+        "name": "BATH 01",
+        "floor": "Floor 00",
+        "area": 30,
+        "width": null,
+        "length": null,
+        "roomType": "Bath",
+        "applicableDetails": []
+      },
+      {
+        "name": "GARAGE",
+        "floor": "Floor 00",
+        "area": 313,
+        "width": null,
+        "length": null,
+        "roomType": "Garage",
+        "applicableDetails": []
+      }
+    ],
+    "totalArea": 1205,
+    "summary": "Floor plan contains 6 rooms with a total area of 1205 sq. ft."
+  }
+}

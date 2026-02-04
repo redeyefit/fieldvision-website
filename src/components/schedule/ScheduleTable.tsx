@@ -83,7 +83,7 @@ export function ScheduleTable({ tasks, allTasks, onReorder, onUpdateTask, disabl
 
   if (tasks.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <svg className="w-16 h-16 mx-auto text-fv-gray-700 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -98,8 +98,9 @@ export function ScheduleTable({ tasks, allTasks, onReorder, onUpdateTask, disabl
   }
 
   return (
-    <div className="flex-1 overflow-auto">
-      <table className="w-full text-sm">
+    <div className="h-full flex flex-col min-h-0">
+      <div className="flex-1 min-h-0 overflow-auto">
+        <table className="w-full text-sm block">
         <thead className="bg-fv-gray-800 sticky top-0 z-10">
           <tr>
             <th className="w-8 px-2 py-3 text-left text-xs font-medium text-fv-gray-400 uppercase tracking-wider">#</th>
@@ -225,6 +226,7 @@ export function ScheduleTable({ tasks, allTasks, onReorder, onUpdateTask, disabl
           </Droppable>
         </DragDropContext>
       </table>
+      </div>
     </div>
   );
 }

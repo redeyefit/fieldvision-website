@@ -1,0 +1,72 @@
+# Test Case: Feliz Project Floor Plan
+# Ground truth from 2026-02-01 testing session
+# This is the floor plan that exposed Claude's room name hallucination issue
+
+id: feliz_floor_plan
+description: "Feliz project floor plan - verified 14 rooms"
+
+input:
+  # Image path relative to test_cases directory
+  # TODO: Export actual floor plan PNG from PDF
+  image: ./images/feliz_floor_plan.png
+
+  variables:
+    sheet_number: "A2.1"
+    sheet_title: "Floor Plan"
+    building_description: "Single family residence"
+    cover_sheet_total_sf: ""
+
+expected:
+  room_count: 14
+  rooms:
+    # From actual blueprint labels (verified by user)
+    - name: "PRIMARY BED"
+      area: null  # TODO: Add exact area from blueprint label
+    - name: "PRIMARY BATH"
+      area: null
+    - name: "PRIMARY CLOSET"
+      area: null
+    - name: "CLOSET"
+      area: null
+    - name: "BEDROOM 01"
+      area: null
+    - name: "BEDROOM 02"
+      area: null
+    - name: "BATHROOM 02"
+      area: null
+    - name: "VANITY"
+      area: null
+    - name: "KITCHEN"
+      area: null
+    - name: "LIVING ROOM"
+      area: 398  # This was labeled on the blueprint
+    - name: "OFFICE/GUEST ROOM"  # Claude was calling this "BEDROOM" - WRONG
+      area: null
+    - name: "BATH"
+      area: null
+    - name: "DINING"
+      area: null
+    - name: "GARAGE"
+      area: null
+
+  total_area: null  # TODO: Fill from blueprint if labeled
+
+eval:
+  # Strict matching - no fuzzy allowed
+  room_name_match: exact_with_synonyms
+  area_match: exact_when_labeled
+  missing_room: FAIL
+  extra_room: FAIL
+  order_sensitive: false
+
+notes: |
+  This test case validates that the model reads ACTUAL room labels from the blueprint.
+
+  Key validation:
+  - "OFFICE/GUEST ROOM" must NOT be called "BEDROOM" (this was Claude's hallucination)
+  - All 14 rooms must be found
+  - LIVING ROOM area must be 398 (labeled on blueprint)
+
+  History:
+  - 2026-02-01: Created after Claude hallucinated room names
+  - Switched to Gemini which correctly read labels

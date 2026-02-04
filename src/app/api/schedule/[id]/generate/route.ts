@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
-import { generateScheduleFromEnriched } from '@/lib/ai/anthropic';
-import { enrichLineItems } from '@/lib/ai/openai';
+import { generateSchedule } from '@/lib/ai/anthropic';
 import { recalculateTasks } from '@/lib/schedule/workdays';
 import { v4 as uuidv4 } from 'uuid';
 
-// Claude + ChatGPT pipeline takes longer (~25-55s total)
-export const maxDuration = 90;
+// Claude schedule generation - large contracts need more time
+export const maxDuration = 120;
 
 // Helper to verify project ownership
 async function verifyProjectOwnership(
@@ -83,26 +82,16 @@ export async function POST(
       );
     }
 
-    // Pipeline: ChatGPT (enrich) → Claude (schedule)
+    // Generate schedule with Claude
     let retries = 3;
     let lastError: Error | null = null;
 
     while (retries > 0) {
       try {
-        // Step 1: Enrich line items with ChatGPT (construction domain expertise)
-        console.log('[Generate] Step 1: Enriching line items with ChatGPT...');
-        const enrichmentResult = await enrichLineItems(
+        console.log('[Generate] Generating schedule with Claude...');
+        const result = await generateSchedule(
           lineItems.map((item) => ({ text: item.text, trade: item.trade || 'General' }))
         );
-        console.log('[Generate] Enrichment complete:', {
-          enrichedItems: enrichmentResult.enriched_items?.length || 0,
-          missingItems: enrichmentResult.missing_items?.length || 0,
-          warnings: enrichmentResult.warnings?.length || 0,
-        });
-
-        // Step 2: Generate schedule with Claude using enriched data
-        console.log('[Generate] Step 2: Generating schedule with Claude...');
-        const result = await generateScheduleFromEnriched(enrichmentResult);
 
         // Generate UUIDs for tasks
         const taskIds = result.tasks.map(() => uuidv4());

@@ -282,7 +282,7 @@ function SchedulePageContent() {
   }, [exportCSV]);
 
   return (
-    <div className="min-h-screen bg-fv-black text-white flex flex-col">
+    <div className="h-screen bg-fv-black text-white flex flex-col overflow-hidden">
       {/* Header */}
       <header className="h-14 border-b border-fv-gray-800 px-6 flex items-center justify-between bg-fv-gray-900/50 backdrop-blur-sm">
         <div className="flex items-center gap-4">
@@ -478,14 +478,18 @@ function SchedulePageContent() {
           </div>
         </div>
 
-        {/* Right Pane - Schedule Editor */}
-        <div ref={containerRef} className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-          {/* Schedule Table Area - explicit flex basis to enforce split */}
-          <div
-            className="p-6 overflow-hidden min-h-0"
-            style={{ flex: `0 0 calc(${(1 - splitRatio) * 100}% - 6px)` }}
-          >
-            <div className="bg-fv-gray-900 rounded-lg h-full flex flex-col overflow-hidden">
+        {/* Right Pane - Schedule Editor - Using CSS Grid with fr units */}
+        <div
+          ref={containerRef}
+          className="flex-1 min-w-0 overflow-hidden"
+          style={{
+            display: 'grid',
+            gridTemplateRows: `${(1 - splitRatio)}fr 12px ${splitRatio}fr`,
+          }}
+        >
+          {/* Schedule Table Area */}
+          <div className="px-6 pt-6 pb-0 overflow-hidden min-h-0">
+            <div className="bg-fv-gray-900 rounded-lg h-full overflow-hidden flex flex-col min-h-0">
               <ScheduleTable
                 tasks={tasks}
                 allTasks={tasks}
@@ -499,30 +503,27 @@ function SchedulePageContent() {
           {/* Resizable Divider */}
           <div
             onMouseDownCapture={handleDividerMouseDown}
-            className="h-3 bg-fv-gray-800 hover:bg-fv-blue cursor-ns-resize flex items-center justify-center group transition-colors relative z-20 flex-shrink-0"
+            className="bg-fv-gray-800 hover:bg-fv-blue cursor-ns-resize flex items-center justify-center group transition-colors relative z-20"
           >
             <div className="w-12 h-1 bg-fv-gray-600 group-hover:bg-white rounded-full transition-colors" />
           </div>
 
-          {/* Gantt Preview Area - explicit flex basis to enforce split */}
-          <div
-            className="p-4 overflow-hidden min-h-0"
-            style={{ flex: `0 0 calc(${splitRatio * 100}% - 6px)` }}
-          >
-            <div className="bg-fv-gray-900 rounded-lg h-full overflow-hidden">
+          {/* Gantt Preview Area */}
+          <div className="px-4 pb-4 pt-0 overflow-hidden min-h-0">
+            <div className="bg-fv-gray-900 rounded-lg h-full overflow-auto">
               <GanttBars tasks={tasks} />
             </div>
           </div>
-
-          {/* Ask the Field Sidebar */}
-          <AskTheField
-            isOpen={askFieldOpen}
-            onToggle={() => setAskFieldOpen(!askFieldOpen)}
-            onAskProject={handleAskProject}
-            onAskGeneral={handleAskGeneral}
-            disabled={isLoading}
-          />
         </div>
+
+        {/* Ask the Field Sidebar - positioned outside grid */}
+        <AskTheField
+          isOpen={askFieldOpen}
+          onToggle={() => setAskFieldOpen(!askFieldOpen)}
+          onAskProject={handleAskProject}
+          onAskGeneral={handleAskGeneral}
+          disabled={isLoading}
+        />
       </div>
     </div>
   );

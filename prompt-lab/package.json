@@ -1,0 +1,26 @@
+{
+  "name": "prompt-lab",
+  "version": "1.0.0",
+  "description": "Internal tool for iterating on AI prompts",
+  "main": "cli.ts",
+  "bin": {
+    "promptlab": "./cli.ts"
+  },
+  "scripts": {
+    "promptlab": "npx ts-node cli.ts",
+    "list": "npx ts-node cli.ts list",
+    "render": "npx ts-node cli.ts render",
+    "test": "npx ts-node cli.ts test",
+    "export": "npx ts-node cli.ts export",
+    "compare": "npx ts-node cli.ts compare"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}

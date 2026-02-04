@@ -167,8 +167,112 @@ export async function parseContractPDF(
   }
 }
 
+const SCHEDULE_SYSTEM_PROMPT = `You are a construction scheduling expert creating EFFICIENT, REALISTIC schedules for residential renovations.
+
+GOAL: Create a practical schedule with appropriate detail. More scope items = more tasks.
+
+TASK COUNT GUIDELINES (based on input size):
+- 10-30 line items → 8-15 tasks (small remodel)
+- 30-60 line items → 15-25 tasks (medium project)
+- 60-100 line items → 25-40 tasks (large renovation)
+- 100+ line items → 40-60 tasks (major project)
+
+CRITICAL RULES:
+
+1. PRESERVE MEANINGFUL DETAIL - Keep distinct work items separate:
+   - Separate tasks for different rooms/areas (Kitchen Demo vs Bathroom Demo)
+   - Separate phases within trades (Rough-in vs Trim-out vs Finals)
+   - If the contract lists it separately, keep it separate
+   - ONLY combine truly redundant items (e.g., "install outlet" and "install outlets" → one task)
+
+2. MAXIMIZE PARALLEL WORK - Multiple trades work simultaneously:
+   - Plumbing, Electrical, HVAC rough-ins happen CONCURRENTLY (same time period)
+   - Tile in bathrooms while paint in other rooms
+   - Cabinet install while countertop fabrication (off-site)
+   - Flooring in one area while trim in another
+
+3. REALISTIC DURATIONS - Use actual crew productivity:
+   - Demo per area: 1-3 days
+   - Rough-in per trade: 3-8 days depending on scope
+   - Drywall: 5-10 days (hang + tape + texture)
+   - Paint per area: 2-5 days
+   - Tile per bathroom: 3-5 days
+   - Cabinet install: 2-4 days
+   - Flooring per area: 2-4 days
+
+4. OFF-SITE WORK PARALLEL - Fabrication doesn't extend timeline:
+   - Countertop template → fabrication happens DURING other work → install
+   - Custom cabinets fabricate BEFORE needed, deliver on time
+   - Don't put fabrication on critical path
+
+5. DEPENDENCIES - Only set TRUE blockers:
+   - Rough-ins need framing complete
+   - Drywall needs ALL rough-ins + insulation done
+   - Paint needs drywall done
+   - Cabinets need paint done (or paint after)
+   - Countertops need cabinets
+   - BUT: rough-ins don't depend on each other (parallel!)
+
+NAMING FORMAT: "[Trade] - [Specific Work]" (e.g., "Plumbing - Kitchen Rough-in", "Paint - Master Bedroom")
+
+EXCLUDE: General conditions, supervision, documentation, meetings, permit tracking.
+ONLY include PHYSICAL CONSTRUCTION WORK.`;
+
 /**
- * Generate schedule from confirmed line items (legacy - without ChatGPT enrichment)
+ * Generate schedule for a single batch of items
+ */
+async function generateScheduleBatch(
+  lineItems: Array<{ text: string; trade: string }>,
+  batchContext?: string
+): Promise<Array<{
+  name: string;
+  trade: string;
+  duration_days: number;
+  depends_on_indices: number[];
+  reasoning?: string;
+}>> {
+  const itemsList = lineItems
+    .map((item, i) => `${i + 1}. [${item.trade}] ${item.text}`)
+    .join('\n');
+
+  const contextNote = batchContext ? `\n\nCONTEXT: ${batchContext}` : '';
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 16384,
+    temperature: 0,
+    system: SCHEDULE_SYSTEM_PROMPT,
+    tools: [GENERATE_SCHEDULE_TOOL],
+    tool_choice: { type: 'tool', name: 'generate_schedule' },
+    messages: [
+      {
+        role: 'user',
+        content: `Generate a construction schedule for these ${lineItems.length} scope items. Create approximately ${Math.max(5, Math.ceil(lineItems.length / 4))} to ${Math.max(10, Math.ceil(lineItems.length / 2))} tasks - keep distinct work items separate.${contextNote}\n\nScope Items:\n${itemsList}`,
+      },
+    ],
+  });
+
+  console.log(`[Anthropic] Batch response stop_reason: ${response.stop_reason}, usage: ${JSON.stringify(response.usage)}`);
+
+  const toolUse = response.content.find((block) => block.type === 'tool_use');
+  if (!toolUse || toolUse.type !== 'tool_use') {
+    throw new Error('Claude did not return structured schedule');
+  }
+
+  const result = toolUse.input as { tasks: Array<{
+    name: string;
+    trade: string;
+    duration_days: number;
+    depends_on_indices: number[];
+    reasoning?: string;
+  }>};
+
+  return result.tasks;
+}
+
+/**
+ * Generate schedule from confirmed line items
+ * For large contracts (>30 items), processes in batches and merges results
  * Uses Claude tool_use for structured output
  */
 export async function generateSchedule(
@@ -182,77 +286,156 @@ export async function generateSchedule(
     reasoning?: string;
   }>;
 }> {
-  const systemPrompt = `You are a construction scheduling expert. Generate a DETAILED construction schedule by breaking down each line item into realistic construction phases.
+  console.log(`[Anthropic] generateSchedule called with ${lineItems.length} items`);
 
-CRITICAL: Break down each scope item into multiple sub-tasks representing real construction phases. For example:
-- "Stone countertops" becomes: Stone - Templates (1 day), Stone - Fabrication (5 days), Stone - Install (2 days), Stone - Seal (1 day)
-- "Electrical" becomes: Electrical - Rough-in (5 days), Electrical - Trim (3 days), Electrical - Finals/Testing (1 day)
-- "Tile work" becomes: Tile - Layout/Prep (1 day), Tile - Waterproofing (1 day), Tile - Install (5 days), Tile - Grout (2 days), Tile - Seal (1 day)
-- "Cabinets" becomes: Cabinets - Delivery/Stage (1 day), Cabinets - Install Base (2 days), Cabinets - Install Upper (2 days), Cabinets - Hardware/Adjust (1 day)
+  // For small contracts, process in one call
+  if (lineItems.length <= 30) {
+    const tasks = await generateScheduleBatch(lineItems);
+    return { tasks };
+  }
 
-NAMING FORMAT: "[Material/Trade] - [Phase]" (e.g., "Plumbing - Rough-in", "Paint - Prime", "Paint - Finish Coat")
+  // For large contracts, batch by trade to stay within token limits
+  console.log(`[Anthropic] Large contract detected, processing in batches by trade`);
 
-RULES:
-1. ALWAYS break down items into multiple realistic phases - never leave a single generic task
-2. Order tasks logically (demo → rough-in → finishes → punch)
-3. Set dependencies accurately - a task depends on what must complete first
-4. Duration estimates in WORKDAYS (not calendar days)
-5. Be conservative - slightly over-estimate rather than under-estimate
-6. EXCLUDE administrative/overhead items - these are NOT schedulable tasks:
-   - General Conditions (supervision, safety meetings, job site management)
-   - Documentation (daily logs, photo documentation, schedule updates)
-   - Communication (owner meetings, RFIs, submittals)
-   - Permits/Inspections scheduling (just schedule the actual inspection, not tracking)
-   ONLY include actual PHYSICAL CONSTRUCTION WORK that crews perform.
+  // Group items by trade
+  const itemsByTrade: Record<string, Array<{ text: string; trade: string }>> = {};
+  for (const item of lineItems) {
+    const trade = item.trade || 'General';
+    if (!itemsByTrade[trade]) {
+      itemsByTrade[trade] = [];
+    }
+    itemsByTrade[trade].push(item);
+  }
 
-COMMON PHASE BREAKDOWNS:
-- Demo: Protection/Prep, Demo, Haul-off
-- Framing: Layout, Walls, Headers/Beams, Blocking, Sheathing
-- Plumbing: Rough-in, Top-out, Trim, Finals
-- Electrical: Rough-in, Low Voltage, Trim, Finals/Testing
-- HVAC: Rough-in, Equipment Set, Trim, Start-up/Balance
-- Drywall: Hang, Tape/Mud, Texture, Touch-up
-- Paint: Prep/Prime, Paint Walls, Paint Trim, Touch-up
-- Flooring: Prep/Level, Install, Transitions/Trim
-- Tile: Waterproofing, Layout, Install, Grout, Seal
-- Cabinets: Receive/Stage, Install Base, Install Upper, Hardware
-- Countertops: Template, Fabricate, Install, Seal
-- Appliances: Receive, Set, Connect, Test`;
+  const trades = Object.keys(itemsByTrade);
+  console.log(`[Anthropic] Found ${trades.length} trades: ${trades.join(', ')}`);
 
-  const itemsList = lineItems
-    .map((item, i) => `${i + 1}. [${item.trade}] ${item.text}`)
-    .join('\n');
+  // Process each trade batch
+  const allTasks: Array<{
+    name: string;
+    trade: string;
+    duration_days: number;
+    depends_on_indices: number[];
+    reasoning?: string;
+  }> = [];
+
+  for (const trade of trades) {
+    const tradeItems = itemsByTrade[trade];
+    console.log(`[Anthropic] Processing ${trade}: ${tradeItems.length} items`);
+
+    try {
+      const tradeTasks = await generateScheduleBatch(
+        tradeItems,
+        `This is the ${trade} portion of a larger project with ${lineItems.length} total items. Create ${Math.max(2, Math.ceil(tradeItems.length / 5))} to ${Math.max(4, Math.ceil(tradeItems.length / 3))} tasks for this trade. Keep distinct work items separate - only combine truly redundant items.`
+      );
+
+      // Reset dependency indices for this batch (will be recalculated later)
+      const tasksWithResetDeps = tradeTasks.map(task => ({
+        ...task,
+        depends_on_indices: [], // Dependencies will be recalculated based on construction logic
+      }));
+
+      allTasks.push(...tasksWithResetDeps);
+      console.log(`[Anthropic] ${trade}: generated ${tradeTasks.length} tasks`);
+    } catch (err) {
+      console.error(`[Anthropic] Failed to process ${trade}:`, err);
+      // Continue with other trades
+    }
+  }
+
+  // Now do a final pass to sequence all tasks properly
+  if (allTasks.length > 0) {
+    console.log(`[Anthropic] Final sequencing pass for ${allTasks.length} tasks`);
+    const sequencedTasks = await sequenceAllTasks(allTasks);
+    return { tasks: sequencedTasks };
+  }
+
+  return { tasks: allTasks };
+}
+
+/**
+ * Final pass to sequence all tasks from batches and set cross-trade dependencies
+ */
+async function sequenceAllTasks(
+  tasks: Array<{
+    name: string;
+    trade: string;
+    duration_days: number;
+    depends_on_indices: number[];
+    reasoning?: string;
+  }>
+): Promise<Array<{
+  name: string;
+  trade: string;
+  duration_days: number;
+  depends_on_indices: number[];
+  reasoning?: string;
+}>> {
+  const taskList = tasks.map((t, i) => `${i}. [${t.trade}] ${t.name} (${t.duration_days} days)`).join('\n');
+
+  const sequencingPrompt = `You are a construction scheduling expert. Given a list of tasks from different trades, you need to:
+1. REORDER them in proper construction sequence
+2. SET DEPENDENCIES to MAXIMIZE PARALLEL WORK - only set TRUE blockers
+
+GOAL: Create a TIGHT schedule. Trades work CONCURRENTLY whenever possible.
+
+SEQUENCING ORDER:
+1. Demo/Protection (first)
+2. Framing
+3. Rough-ins - Plumbing, Electrical, HVAC run IN PARALLEL (no deps between them)
+4. Insulation (after ALL rough-ins)
+5. Drywall (after insulation)
+6. Paint (after drywall)
+7. Cabinets (after paint OR overlap with paint)
+8. Countertops (after cabinets - but fabrication is parallel earlier)
+9. Tile (can overlap with paint in different areas)
+10. Flooring (near end)
+11. Finals/testing/punch (last)
+
+CRITICAL - PARALLEL WORK:
+- ALL rough-ins (MEP) depend only on framing, NOT on each other
+- Tile in bathroom can run while paint in living areas
+- Cabinet install while countertop fabricates off-site
+- Multiple finish trades can work in different rooms simultaneously
+
+DEPENDENCY RULES:
+- depends_on_indices uses 0-based index of REORDERED list
+- Only set dependencies for TRUE blockers (can't physically start without predecessor)
+- Rough-ins should have ZERO dependencies between each other
+- Trim phases depend on drywall/paint, not on rough-in completion`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514', // Sonnet for better reasoning on dependencies & durations
-    max_tokens: 8192,
-    temperature: 0, // Deterministic output - same contract should produce same schedule
-    system: systemPrompt,
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 16384,
+    temperature: 0,
+    system: sequencingPrompt,
     tools: [GENERATE_SCHEDULE_TOOL],
     tool_choice: { type: 'tool', name: 'generate_schedule' },
     messages: [
       {
         role: 'user',
-        content: `Generate a DETAILED construction schedule for these scope items. Break down EVERY item into multiple sub-tasks with realistic phases (e.g., Stone becomes: Templates, Fabricate, Install, Seal).\n\nScope Items:\n${itemsList}`,
+        content: `Reorder and set dependencies for these ${tasks.length} tasks. MAXIMIZE PARALLEL WORK - rough-ins concurrent, trades overlap where possible. Target a TIGHT schedule:\n\n${taskList}`,
       },
     ],
   });
 
-  // Extract tool use result
+  console.log(`[Anthropic] Sequencing response stop_reason: ${response.stop_reason}`);
+
   const toolUse = response.content.find((block) => block.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
-    throw new Error('Claude did not return structured schedule');
+    console.error('[Anthropic] Sequencing failed, returning unsequenced tasks');
+    return tasks;
   }
 
-  return toolUse.input as {
-    tasks: Array<{
-      name: string;
-      trade: string;
-      duration_days: number;
-      depends_on_indices: number[];
-      reasoning?: string;
-    }>;
-  };
+  const result = toolUse.input as { tasks: Array<{
+    name: string;
+    trade: string;
+    duration_days: number;
+    depends_on_indices: number[];
+    reasoning?: string;
+  }>};
+
+  return result.tasks;
 }
 
 // Types for ChatGPT enrichment (imported from openai.ts)

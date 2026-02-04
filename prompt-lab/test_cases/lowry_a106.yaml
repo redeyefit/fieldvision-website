@@ -1,0 +1,55 @@
+# Test Case: Lowry A-106 Proposed Floor Plan
+# Ground truth extracted by Codex from Lowry_Full_71_Sheets.pdf page 18
+# All areas are explicitly labeled on the sheet
+
+id: lowry_a106
+description: "Lowry residence - A106 Proposed Floor Plan - 6 labeled rooms"
+
+input:
+  # PNG extracted from PDF page 18 (absolute path for reliability)
+  image: /Users/stevenfernandez/Desktop/FieldVision/FieldVision/Resources/TestFixtures/Blueprints/Lowry_A106_Page18.png
+
+  variables:
+    sheet_number: "A106"
+    sheet_title: "Proposed Floor Plan"
+    building_description: "Lowry Residence"
+    cover_sheet_total_sf: ""
+
+expected:
+  scale: "1/4\" = 1'-0\""
+  room_count: 6
+  total_area: 1205
+  rooms:
+    # All rooms with explicitly labeled areas on the blueprint
+    - name: "OFFICE/GUEST ROOM"
+      area: 117
+    - name: "GARAGE"
+      area: 313
+    - name: "KITCHEN"
+      area: 151
+    - name: "BATH 01"
+      area: 30
+    - name: "LIVING ROOM"
+      area: 398
+    - name: "DINING"
+      area: 196
+
+eval:
+  # Strict matching - all rooms must be found with exact names
+  room_name_match: exact_with_synonyms
+  area_match: exact_when_labeled
+  missing_room: FAIL
+  extra_room: FAIL  # Pantry exists but has no area label - should not be extracted
+  order_sensitive: false
+
+notes: |
+  Source: Lowry_Full_71_Sheets.pdf page 18
+  Scale clearly labeled: 1/4" = 1'-0"
+
+  All 6 rooms have explicit sq.ft. labels on the blueprint.
+  Pantry appears but has no area label - excluded from expected.
+
+  This is a good test because:
+  - OFFICE/GUEST ROOM tests that we don't hallucinate "BEDROOM"
+  - All areas are labeled (strict area matching possible)
+  - Clear scale reference

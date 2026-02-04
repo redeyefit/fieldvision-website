@@ -96,19 +96,30 @@ export function AskTheField({ isOpen, onToggle, onAskProject, onAskGeneral, disa
     return (
       <button
         onClick={onToggle}
-        className="absolute right-0 top-1/2 -translate-y-1/2 bg-fv-gray-800 hover:bg-fv-gray-700 text-fv-gray-400 hover:text-white px-2 py-4 rounded-l-lg text-xs font-medium"
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-30 bg-gradient-to-l from-fv-blue/30 to-fv-gray-800 hover:from-fv-blue/40 hover:to-fv-gray-700 border-l-2 border-t border-b border-fv-blue/50 text-white hover:text-white px-3 py-6 rounded-l-2xl text-sm font-semibold shadow-xl shadow-fv-blue/20 hover:shadow-fv-blue/30 transition-all duration-200 group"
         style={{ writingMode: 'vertical-rl' }}
       >
-        Ask the Field
+        <span className="flex items-center gap-3">
+          {/* Sparkle icon */}
+          <svg className="w-5 h-5 text-fv-blue group-hover:text-fv-blue-light transition-colors" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
+          </svg>
+          <span>Ask the Field</span>
+        </span>
       </button>
     );
   }
 
   return (
-    <div className="absolute right-0 top-0 bottom-0 w-80 bg-fv-gray-900 border-l border-fv-gray-800 flex flex-col">
+    <div className="absolute right-0 top-0 bottom-0 w-80 bg-fv-gray-900 border-l border-fv-gray-700 flex flex-col z-40 shadow-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-fv-gray-800">
-        <h3 className="font-medium text-white">Ask the Field</h3>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-fv-gray-700 bg-fv-gray-900">
+        <h3 className="font-semibold text-white flex items-center gap-2">
+          <svg className="w-4 h-4 text-fv-blue" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
+          </svg>
+          Ask the Field
+        </h3>
         <button
           onClick={onToggle}
           className="p-1 text-fv-gray-400 hover:text-white"
@@ -188,7 +199,7 @@ export function AskTheField({ isOpen, onToggle, onAskProject, onAskGeneral, disa
       )}
 
       {/* Input */}
-      <div className="p-4 border-t border-fv-gray-800">
+      <div className="p-4 border-t border-fv-gray-700 bg-fv-gray-900">
         <div className="flex flex-col gap-2">
           <input
             type="text"
