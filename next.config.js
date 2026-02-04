@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Set Turbopack root to this directory (fixes workspace root detection)
+  turbopack: {
+    root: __dirname,
+  },
+
   // Output static files for existing pages during transition
   trailingSlash: false,
 

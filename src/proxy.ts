@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 
 // Simplified middleware - no auth required for MVP
 // TODO: Add Clerk auth when ready for user accounts
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   // Allow all requests through
   return NextResponse.next();
 }
