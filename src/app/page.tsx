@@ -2,549 +2,615 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const APP_STORE_URL =
   'https://apps.apple.com/us/app/fieldvision-ai-construction/id6756640990';
 
-export default function Home() {
-  // Scroll-triggered glow effect for feature cards
+// ─── Cursor glow ───
+function useCursorGlow() {
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('glow-active');
-          } else {
-            entry.target.classList.remove('glow-active');
-          }
-        });
-      },
-      { threshold: 0.3, rootMargin: '0px 0px -100px 0px' }
-    );
+    const glow = document.createElement('div');
+    glow.className = 'cursor-glow';
+    document.body.appendChild(glow);
+    const move = (e: MouseEvent) => {
+      glow.style.left = e.clientX + 'px';
+      glow.style.top = e.clientY + 'px';
+    };
+    window.addEventListener('mousemove', move);
+    return () => { window.removeEventListener('mousemove', move); glow.remove(); };
+  }, []);
+}
 
-    document.querySelectorAll('.feature-card').forEach((card) => {
-      observer.observe(card);
-    });
+// ─── Counter ───
+function Counter({ target, suffix = '', prefix = '' }: { target: string; suffix?: string; prefix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [display, setDisplay] = useState(prefix + '0' + suffix);
+  const triggered = useRef(false);
 
-    return () => observer.disconnect();
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !triggered.current) {
+        triggered.current = true;
+        const num = parseInt(target.replace(/[^0-9]/g, ''));
+        const duration = 2000;
+        const start = performance.now();
+        const animate = (now: number) => {
+          const progress = Math.min((now - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          setDisplay(prefix + Math.round(num * eased) + suffix);
+          if (progress < 1) requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+      }
+    }, { threshold: 0.5 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [target, suffix, prefix]);
+
+  return <span ref={ref}>{display}</span>;
+}
+
+export default function Home() {
+  const heroRef = useRef<HTMLDivElement>(null);
+  const heroVideoRef = useRef<HTMLVideoElement>(null);
+  const promisesRef = useRef<HTMLDivElement>(null);
+  const sectionsRef = useRef<HTMLDivElement>(null);
+  const mosaicRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [navVisible, setNavVisible] = useState(false);
+  const [activeSection, setActiveSection] = useState(0);
+
+  useCursorGlow();
+
+  // Loading screen
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+      setTimeout(() => setLoaded(true), 100);
+    }, 2400);
+    return () => clearTimeout(timer);
   }, []);
 
+  // Nav on scroll
+  useEffect(() => {
+    const onScroll = () => setNavVisible(window.scrollY > window.innerHeight * 0.5);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Lenis + GSAP
+  useEffect(() => {
+    if (!loaded) return;
+
+    const init = async () => {
+      const gsapModule = await import('gsap');
+      const { ScrollTrigger } = await import('gsap/ScrollTrigger');
+      const Lenis = (await import('lenis')).default;
+      const gsap = gsapModule.default;
+      gsap.registerPlugin(ScrollTrigger);
+
+      // ── LENIS: Smooth scroll ──
+      const lenis = new Lenis({
+        duration: 1.2,
+        easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        smoothWheel: true,
+      });
+
+      // Connect Lenis → ScrollTrigger
+      lenis.on('scroll', ScrollTrigger.update);
+
+      // Drive Lenis from GSAP's ticker for perfect sync
+      gsap.ticker.add((time: number) => {
+        lenis.raf(time * 1000);
+      });
+      gsap.ticker.lagSmoothing(0);
+
+      // Store for cleanup
+      (window as unknown as Record<string, unknown>).__lenis = lenis;
+
+      // ── Shared easing — consistent feel, but animations run on their own clock ──
+      const EASE_IN = 'power2.out';
+      const EASE_OUT = 'power2.in';
+
+      // ── HERO: Video plays freely, scroll controls text overlay ──
+      if (heroRef.current) {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: heroRef.current,
+            start: 'top top',
+            end: '+=200%',
+            pin: true,
+            scrub: 0.3,
+          },
+        });
+
+        tl
+          .to('.hero-badge', { opacity: 0, y: -30, duration: 0.2 }, 0.15)
+          .to('.hero-h1', { opacity: 0, y: -50, duration: 0.25 }, 0.2)
+          .to('.hero-p', { opacity: 0, y: -30, duration: 0.2 }, 0.25)
+          .to('.hero-actions', { opacity: 0, y: -20, duration: 0.2 }, 0.3)
+          .to('.hero-video-overlay', { opacity: 0.15, duration: 0.3 }, 0.25)
+          // Promise text sequence
+          .fromTo('.promise-1', { opacity: 0 }, { opacity: 1, duration: 0.1 }, 0.4)
+          .to('.promise-1', { opacity: 0, duration: 0.1 }, 0.55)
+          .fromTo('.promise-2', { opacity: 0 }, { opacity: 1, duration: 0.1 }, 0.6)
+          .to('.promise-2', { opacity: 0, duration: 0.1 }, 0.75)
+          // Fade to black
+          .to('.hero-fade', { opacity: 1, duration: 0.2 }, 0.85);
+      }
+
+      // ── PROMISE SECTIONS: Scroll pins the view. Content staggers in independently. ──
+      const sections = document.querySelectorAll('.promise-section');
+      sections.forEach((section, i) => {
+        const line = section.querySelector('.ps-line');
+        const header = section.querySelector('.ps-header');
+        const label = section.querySelector('.ps-label');
+        const headline = section.querySelector('.ps-headline');
+        const desc = section.querySelector('.ps-desc');
+        const phone = section.querySelector('.ps-phone');
+
+        // Initial state — each piece hidden separately
+        gsap.set([header, label, headline, desc], { opacity: 0, y: 40 });
+        gsap.set(phone, { opacity: 0, y: 60, scale: 0.95 });
+        if (line) gsap.set(line, { scaleX: 0 });
+
+        const animateIn = () => {
+          const tl = gsap.timeline();
+          if (line) tl.to(line, { scaleX: 1, duration: 1.2, ease: 'power2.inOut' }, 0);
+          tl.to(header, { opacity: 1, y: 0, duration: 0.5, ease: EASE_IN }, 0)
+            .to(label, { opacity: 1, y: 0, duration: 0.4, ease: EASE_IN }, 0.15)
+            .to(headline, { opacity: 1, y: 0, duration: 0.6, ease: EASE_IN }, 0.25)
+            .to(desc, { opacity: 1, y: 0, duration: 0.5, ease: EASE_IN }, 0.4)
+            .to(phone, { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: EASE_IN }, 0.3);
+        };
+
+        ScrollTrigger.create({
+          trigger: section,
+          start: 'top top',
+          end: '+=150%',
+          pin: true,
+          onEnter: () => { setActiveSection(i + 1); animateIn(); },
+          onLeave: () => {
+            gsap.to([header, label, headline, desc], { opacity: 0, y: -30, duration: 0.4, ease: EASE_OUT, stagger: 0.04 });
+            gsap.to(phone, { opacity: 0, y: -40, scale: 0.95, duration: 0.5, ease: EASE_OUT });
+          },
+          onEnterBack: () => { setActiveSection(i + 1); animateIn(); },
+          onLeaveBack: () => {
+            gsap.to([header, label, headline, desc], { opacity: 0, y: 40, duration: 0.4, ease: EASE_OUT });
+            gsap.to(phone, { opacity: 0, y: 60, scale: 0.95, duration: 0.5, ease: EASE_OUT });
+            if (line) gsap.to(line, { scaleX: 0, duration: 0.3 });
+          },
+        });
+      });
+
+      // ── MOSAIC: Time-driven staggered reveal ──
+      if (mosaicRef.current) {
+        const items = mosaicRef.current.querySelectorAll('.mosaic-item');
+        gsap.set(items, { opacity: 0, y: 60, scale: 0.92 });
+        ScrollTrigger.create({
+          trigger: mosaicRef.current,
+          start: 'top 75%',
+          onEnter: () => {
+            gsap.to(items, { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: EASE_IN, stagger: 0.12 });
+          },
+          onLeaveBack: () => {
+            gsap.to(items, { opacity: 0, y: 60, scale: 0.92, duration: 0.4, ease: EASE_OUT });
+          },
+        });
+      }
+
+      // ── Generic reveals — time-driven, triggered by scroll position ──
+      document.querySelectorAll('.reveal').forEach((el) => {
+        gsap.set(el, { opacity: 0, y: 50 });
+        ScrollTrigger.create({
+          trigger: el,
+          start: 'top 85%',
+          onEnter: () => {
+            gsap.to(el, { opacity: 1, y: 0, duration: 0.8, ease: EASE_IN });
+          },
+          onLeaveBack: () => {
+            gsap.to(el, { opacity: 0, y: 50, duration: 0.4, ease: EASE_OUT });
+          },
+        });
+      });
+    };
+
+    init();
+    return () => {
+      const lenis = (window as unknown as Record<string, unknown>).__lenis as { destroy: () => void } | undefined;
+      if (lenis) lenis.destroy();
+      import('gsap/ScrollTrigger').then(({ ScrollTrigger }) => {
+        ScrollTrigger.getAll().forEach((t) => t.kill());
+      });
+    };
+  }, [loaded]);
+
   return (
-    <>
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 px-6 md:px-12 py-4 flex justify-between items-center bg-gradient-to-b from-fv-black/95 to-transparent backdrop-blur-md">
-        <Link href="/" className="flex items-center gap-3 font-display font-semibold text-lg">
-          <div className="bg-white rounded-full p-1.5">
-            <Image src="/logo_backup.png" alt="FieldVision" width={24} height={24} />
+    <div>
+      {/* ═══ LOADING ═══ */}
+      <div className={`fixed inset-0 z-[200] bg-fv-black flex flex-col items-center justify-center transition-all duration-1000 ${loading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <div className="mb-8">
+          <div className="bg-white rounded-2xl p-3 shadow-[0_0_60px_rgba(255,255,255,0.06)]">
+            <Image src="/logo_backup.png" alt="FieldVision" width={48} height={48} className="animate-pulse" />
           </div>
-          <span>FieldVision AI</span>
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/schedule"
-            className="font-display font-medium text-sm text-gray-400 hover:text-fv-blue transition-colors"
-          >
-            Schedule Maker
+        </div>
+        <div className="w-48 h-[2px] bg-white/[0.06] rounded-full overflow-hidden mb-6">
+          <div className="h-full bg-gradient-to-r from-fv-blue to-fv-blue-light rounded-full animate-loading-bar" />
+        </div>
+        <p className="font-display text-sm tracking-[0.3em] uppercase text-gray-500">Building your experience</p>
+      </div>
+
+      {/* ═══ NAV — Appears on scroll ═══ */}
+      <nav className={`fixed top-0 left-0 right-0 z-[100] px-3 md:px-10 py-3 md:py-4 transition-all duration-700 ${navVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+        <div className="max-w-7xl mx-auto flex justify-between items-center bg-black/60 backdrop-blur-2xl border border-white/[0.06] rounded-xl md:rounded-2xl px-4 md:px-5 py-2.5 md:py-3">
+          <Link href="/" className="flex items-center gap-2 font-display font-semibold text-sm tracking-tight">
+            <div className="bg-white rounded-lg md:rounded-xl p-1 md:p-1.5">
+              <Image src="/logo_backup.png" alt="FieldVision" width={20} height={20} className="w-4 h-4 md:w-5 md:h-5" />
+            </div>
+            <span className="hidden sm:inline">FieldVision</span>
           </Link>
-          <a
-            href={APP_STORE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-display font-medium text-sm px-5 py-2.5 bg-fv-blue text-white rounded-md hover:bg-transparent hover:border-fv-blue border border-transparent transition-all duration-300 hover:shadow-[0_0_30px_rgba(59,155,217,0.3)]"
-          >
-            Download Free
+          <div className="hidden md:flex items-center gap-8">
+            {['Capture', 'Generate', 'Send', 'Ask'].map((item, i) => (
+              <a key={item} href={`#section-${i + 1}`} className={`font-display text-[11px] font-medium tracking-[0.15em] uppercase transition-colors duration-300 ${activeSection === i + 1 ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+                {item}
+              </a>
+            ))}
+          </div>
+          <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="font-display text-[11px] md:text-xs font-semibold px-4 md:px-5 py-2 md:py-2.5 bg-white text-black rounded-lg md:rounded-xl hover:bg-gray-100 transition-all duration-300">
+            Download
           </a>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="min-h-screen flex flex-col justify-center items-center text-center px-6 pt-24 pb-16 relative">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[150%] h-full bg-[radial-gradient(ellipse_at_center_top,rgba(59,155,217,0.3)_0%,transparent_50%)] pointer-events-none" />
-
-        <div className="mb-8 animate-fade-in-up">
-          <div className="inline-block bg-white rounded-full p-8 md:p-10">
-            <Image src="/logo_backup.png" alt="FieldVision AI" width={200} height={200} className="w-32 md:w-48 h-auto" />
-          </div>
-          <div className="font-display text-3xl md:text-5xl font-bold mt-6">FieldVision AI</div>
+      {/* ═══ HERO — Full-bleed video ═══ */}
+      <section ref={heroRef} className="h-screen relative flex items-end overflow-hidden">
+        {/* Video */}
+        <div className="hero-video absolute inset-0">
+          <video ref={heroVideoRef} autoPlay muted loop playsInline preload="auto" className="w-full h-full object-cover" onLoadedMetadata={(e) => { (e.target as HTMLVideoElement).playbackRate = 0.6; }}>
+            <source src="/hero.mp4" type="video/mp4" />
+          </video>
         </div>
 
-        <span className="inline-flex items-center gap-2 font-display text-xs font-medium uppercase tracking-widest text-green-500 px-4 py-2 border border-green-500 rounded-full mb-8 bg-green-500/10 animate-fade-in-up animate-delay-200">
-          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-          Now on the App Store
-        </span>
+        {/* Overlays */}
+        <div className="hero-video-overlay absolute inset-0 bg-fv-black/55 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-fv-black/80 via-transparent to-fv-black/30 pointer-events-none" />
+        <div className="hero-fade absolute inset-0 bg-fv-black opacity-0 pointer-events-none" />
 
-        <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold leading-tight tracking-tight max-w-4xl mb-6 animate-fade-in-up animate-delay-300">
-          Get home <span className="text-fv-blue">30 minutes earlier.</span>
-        </h1>
+        {/* Hero content — left aligned like Valmont */}
+        <div className="hero-content relative z-10 w-full px-6 md:px-16 pb-24 md:pb-32">
+          <div className="hero-badge mb-4 md:mb-6">
+            <span className="inline-flex items-center gap-2 text-[10px] md:text-[11px] font-display font-semibold uppercase tracking-[0.25em] md:tracking-[0.3em] text-green-400 px-3 md:px-4 py-1.5 md:py-2 border border-green-400/20 rounded-full bg-green-500/[0.06]">
+              <span className="relative flex h-1.5 w-1.5 md:h-2 md:w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-full w-full bg-green-400" />
+              </span>
+              Live on the App Store
+            </span>
+          </div>
 
-        <p className="text-lg md:text-xl text-gray-400 max-w-2xl mb-10 leading-relaxed animate-fade-in-up animate-delay-400">
-          Photos, video, or voice — FieldVision fuses it all into one professional daily report in 30 seconds. Then ask the field about codes, budgets, or schedules. It knows your whole project.
-        </p>
+          <h1 className="hero-h1 font-display text-[clamp(2.5rem,8vw,6.5rem)] font-bold leading-[0.92] tracking-[-0.03em] max-w-4xl mb-4 md:mb-6">
+            Get Home<br />
+            <span className="text-fv-blue">30 Minutes Earlier.</span>
+          </h1>
 
-        <div className="flex flex-col items-center gap-4 animate-fade-in-up animate-delay-500">
-          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md sm:max-w-none">
-            <a
-              href={APP_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 font-display font-semibold px-8 py-4 bg-fv-blue text-white rounded-lg hover:bg-fv-blue-dark hover:-translate-y-0.5 hover:shadow-[0_10px_40px_rgba(59,155,217,0.3)] transition-all"
-            >
-              <AppleIcon />
-              Download on App Store
+          <p className="hero-p text-base md:text-xl text-gray-300 max-w-lg mb-8 md:mb-10 leading-relaxed font-light">
+            AI-powered daily reports from photos, video, and voice. Built for the field.
+          </p>
+
+          <div className="hero-actions flex flex-col sm:flex-row gap-3 md:gap-4">
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="font-display font-semibold text-sm md:text-base px-6 md:px-8 py-3.5 md:py-4 bg-white text-black rounded-2xl hover:shadow-[0_0_60px_rgba(255,255,255,0.15)] transition-all duration-500 flex items-center justify-center gap-2.5">
+              <AppleIcon /> Download Free
             </a>
-            <a
-              href="#how-it-works"
-              className="flex items-center justify-center gap-2 font-display font-semibold px-8 py-4 bg-transparent text-white border border-gray-700 rounded-lg hover:border-fv-blue hover:text-fv-blue transition-all"
-            >
-              <PlayIcon />
-              See How It Works
+            <a href="#section-1" className="font-display font-medium text-sm md:text-base px-6 md:px-8 py-3.5 md:py-4 text-white border border-white/20 rounded-2xl hover:bg-white/10 transition-all duration-500 text-center">
+              Explore
             </a>
           </div>
-          <p className="text-sm text-gray-500">Free to download. No credit card required.</p>
+        </div>
+
+        {/* Promise text overlays (appear during scroll) */}
+        <div className="promise-1 absolute inset-0 flex items-center justify-center z-20 pointer-events-none opacity-0">
+          <p className="font-display text-[clamp(2rem,5vw,4.5rem)] font-bold tracking-tight text-center leading-tight">
+            It&apos;s more than an app.
+          </p>
+        </div>
+        <div className="promise-2 absolute inset-0 flex items-center justify-center z-20 pointer-events-none opacity-0">
+          <p className="font-display text-[clamp(2rem,5vw,4.5rem)] font-bold tracking-tight text-center leading-tight">
+            It&apos;s a promise.
+          </p>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="absolute bottom-0 left-0 right-0 z-30 px-4 md:px-16 py-4 md:py-5 flex justify-between items-center border-t border-white/[0.06]">
+          <span className="font-display text-[9px] md:text-[10px] font-semibold tracking-[0.2em] uppercase text-gray-500">FieldVision</span>
+          <span className="font-display text-[9px] md:text-[10px] tracking-[0.15em] md:tracking-[0.2em] uppercase text-gray-500 hidden sm:block">Built for the field.</span>
+          <span className="font-display text-[9px] md:text-[10px] tracking-[0.15em] md:tracking-[0.2em] uppercase text-gray-500 flex items-center gap-1.5">
+            Scroll
+            <svg className="w-3 h-3 animate-bounce" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+          </span>
         </div>
       </section>
 
-      {/* App Preview */}
-      <section className="py-16 md:py-24 px-6 relative">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent" />
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="font-display text-2xl md:text-3xl font-semibold mb-2">Built for the Job Site</h2>
-            <p className="text-gray-500">Clean, fast, and designed for one-handed use</p>
+      {/* ═══ PROMISE SECTIONS — Full-bleed numbered ═══ */}
+      {[
+        {
+          id: 'section-1',
+          num: '01',
+          category: 'Capture',
+          promise: 'To end the era of forgotten field notes.',
+          desc: 'Photos, video, voice — tag rooms as you walk. One-handed, on the move. Everything you capture goes straight into your report.',
+          screenshot: '/screenshots/01_home.png',
+          bgImage: '/section-01.webp',
+        },
+        {
+          id: 'section-2',
+          num: '02',
+          category: 'Generate',
+          promise: 'To give you back your evenings.',
+          desc: 'One tap. AI fuses photos, video, voice, and notes into a structured daily report. Weather and zones included. Done in 30 seconds.',
+          screenshot: '/screenshots/02_project_detail.png',
+          bgImage: '/section-02.webp',
+        },
+        {
+          id: 'section-3',
+          num: '03',
+          category: 'Send',
+          promise: 'To make every report bulletproof.',
+          desc: 'Review, edit, then PDF, email, or share. Professional documentation that protects you when disputes arise. Done before you leave the site.',
+          screenshot: '/screenshots/04_daily_report.png',
+          bgImage: '/section-03.webp',
+        },
+        {
+          id: 'section-4',
+          num: '04',
+          category: 'Ask',
+          promise: 'To put codes, budgets, and schedules in your pocket.',
+          desc: 'IRC egress requirements. HVAC budget. Inspection dates. One AI that knows building codes AND your entire project history.',
+          screenshot: '/screenshots/03_project_sections.png',
+          bgImage: '/section-04.webp',
+        },
+      ].map((section, i) => (
+        <section
+          key={i}
+          id={section.id}
+          className="promise-section min-h-screen relative flex items-center bg-fv-black overflow-hidden"
+        >
+          {/* Full-bleed construction photography */}
+          <Image src={section.bgImage} alt="" fill className="object-cover opacity-30" priority={i === 0} />
+          <div className="absolute inset-0 bg-gradient-to-r from-fv-black/80 via-fv-black/50 to-transparent" />
+
+          {/* Content — two column: text left, phone right */}
+          <div className="ps-content relative z-10 w-full px-6 md:px-16 py-16 md:py-24">
+            {/* Number + Category + Progress line */}
+            <div className="ps-header flex items-center gap-4 md:gap-6 mb-8 md:mb-12">
+              <span className="font-display text-[10px] md:text-[11px] font-medium tracking-[0.2em] text-gray-600">{section.num}</span>
+              <div className="ps-line h-[1px] w-24 md:w-80 bg-white/20 origin-left" />
+              <span className="font-display text-[10px] md:text-[11px] font-semibold tracking-[0.2em] md:tracking-[0.25em] uppercase text-gray-400">{section.category}</span>
+            </div>
+
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-10 md:gap-20">
+              {/* Text side */}
+              <div className="md:flex-1 md:max-w-xl">
+                <div className="ps-label mb-3 md:mb-4">
+                  <span className="font-display text-[9px] md:text-[10px] font-medium tracking-[0.25em] md:tracking-[0.3em] uppercase text-fv-blue">It&apos;s a promise</span>
+                </div>
+                <h2 className="ps-headline font-display text-[clamp(1.5rem,5vw,4rem)] font-bold leading-[1.1] tracking-tight mb-5 md:mb-8">
+                  {section.promise}
+                </h2>
+                <p className="ps-desc text-gray-400 text-base md:text-lg leading-relaxed max-w-xl">
+                  {section.desc}
+                </p>
+              </div>
+
+              {/* Phone side — larger, intentional */}
+              <div className="ps-phone md:flex-shrink-0">
+                <div className="bg-gradient-to-b from-[#2a2a2e] to-[#1a1a1e] rounded-[36px] md:rounded-[44px] p-[3px] md:p-[5px] shadow-[0_30px_80px_rgba(0,0,0,0.7)] border border-white/[0.06]">
+                  <div className="bg-black rounded-[33px] md:rounded-[40px] p-[2px]">
+                    <Image
+                      src={section.screenshot}
+                      alt={section.category}
+                      width={300}
+                      height={640}
+                      className="rounded-[31px] md:rounded-[38px] w-44 md:w-56 lg:w-64 h-auto"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex justify-center gap-4 md:gap-8 flex-wrap">
+
+          {/* Bottom bar */}
+          <div className="absolute bottom-0 left-0 right-0 z-30 px-4 md:px-16 py-4 md:py-5 flex justify-between items-center border-t border-white/[0.04]">
+            <span className="font-display text-[9px] md:text-[10px] font-semibold tracking-[0.2em] uppercase text-gray-600">FieldVision</span>
+            <span className="font-display text-[9px] md:text-[10px] tracking-[0.15em] md:tracking-[0.2em] uppercase text-gray-600 hidden sm:block">Built for the field.</span>
+            <span className="font-display text-[9px] md:text-[10px] tracking-[0.15em] md:tracking-[0.2em] uppercase text-gray-600 flex items-center gap-1.5">
+              Scroll
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+            </span>
+          </div>
+        </section>
+      ))}
+
+      {/* ═══ STATS ═══ */}
+      <section className="relative py-24 md:py-40 px-6 bg-fv-black">
+        <div className="max-w-5xl mx-auto">
+          <div className="reveal text-center mb-20">
+            <span className="font-display text-[10px] font-semibold tracking-[0.3em] uppercase text-red-400/80 block mb-5">The Problem</span>
+            <h2 className="font-display text-[clamp(2rem,5vw,4rem)] font-bold leading-[1.1] tracking-tight">
+              Documentation shouldn&apos;t<br />cost you your evenings.
+            </h2>
+          </div>
+
+          <div className="reveal grid md:grid-cols-3 gap-4 mb-20">
+            {[
+              { num: '45', suffix: 'min', prefix: '', label: 'Per report, manually', color: 'from-red-500/10' },
+              { num: '62', suffix: '%', prefix: '', label: 'Of supers skip logs', color: 'from-orange-500/10' },
+              { num: '42', suffix: 'K', prefix: '$', label: 'Avg dispute cost', color: 'from-yellow-500/10' },
+            ].map((stat, i) => (
+              <div key={i} className={`group text-center p-10 rounded-3xl bg-gradient-to-b ${stat.color} to-transparent border border-white/[0.04]`}>
+                <div className="font-display text-[clamp(3rem,6vw,5rem)] font-bold text-white mb-2 tracking-tight">
+                  <Counter target={stat.num} suffix={stat.suffix} prefix={stat.prefix} />
+                </div>
+                <div className="text-sm text-gray-500">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="reveal max-w-2xl mx-auto text-center">
+            <p className="text-gray-400 text-lg leading-relaxed">
+              You&apos;re solving problems on the fly. By the time you get home, the last thing you want to do is write a report.
+              <span className="text-white font-medium"> FieldVision does it for you.</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ PHOTO MOSAIC ═══ */}
+      <section className="relative py-20 md:py-32 px-6 bg-fv-black overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+
+        {/* Curved connecting lines (SVG) */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.04]" viewBox="0 0 1200 800" fill="none">
+          <path d="M0 400 Q300 200 600 400 Q900 600 1200 400" stroke="white" strokeWidth="1" />
+          <path d="M0 500 Q400 300 800 500 Q1000 600 1200 450" stroke="white" strokeWidth="1" />
+        </svg>
+
+        <div ref={mosaicRef} className="max-w-6xl mx-auto">
+          {/* Mosaic — 3 phones, clean and centered */}
+          <div className="flex justify-center gap-4 md:gap-10 flex-wrap mb-12 md:mb-16">
             {[
               { src: '/screenshots/01_home.png', label: 'Your Projects' },
               { src: '/screenshots/02_project_detail.png', label: 'Capture & Generate' },
-              { src: '/screenshots/04_daily_report.png', label: 'AI-Generated Report' },
+              { src: '/screenshots/04_daily_report.png', label: 'AI Report' },
             ].map((phone, i) => (
-              <div key={i} className="group">
-                <div className="bg-gradient-to-br from-gray-900 to-black rounded-[40px] p-3 shadow-2xl hover:-translate-y-2 hover:rotate-x-5 transition-transform duration-500">
-                  <Image
-                    src={phone.src}
-                    alt={phone.label}
-                    width={280}
-                    height={600}
-                    className="rounded-[30px] w-40 md:w-56 lg:w-64 h-auto"
-                  />
+              <div key={i} className="mosaic-item">
+                <div className="bg-gradient-to-b from-[#2a2a2e] to-[#1a1a1e] rounded-[44px] p-[5px] shadow-[0_40px_80px_rgba(0,0,0,0.6)] border border-white/[0.04]">
+                  <div className="bg-black rounded-[40px] p-[2px]">
+                    <Image
+                      src={phone.src}
+                      alt={phone.label}
+                      width={260}
+                      height={560}
+                      className="rounded-[38px] w-28 sm:w-36 md:w-52 h-auto"
+                    />
+                  </div>
                 </div>
-                <p className="text-center mt-4 text-sm text-gray-500 font-medium">{phone.label}</p>
+                <p className="text-center mt-5 text-xs text-gray-500 font-display tracking-wide uppercase">{phone.label}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      {/* Problem Section */}
-      <section className="py-24 px-6 bg-[#111]">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <span className="font-display text-xs font-semibold uppercase tracking-widest text-fv-blue mb-4 block">
-                The Problem
-              </span>
-              <h2 className="font-display text-3xl md:text-4xl font-bold leading-tight mb-6">
-                Documentation shouldn&apos;t be the hardest part of your job.
-              </h2>
-              <p className="text-gray-400 text-lg leading-relaxed mb-4">
-                You&apos;re running crews, managing subs, solving problems on the fly. By the time you get home, the last thing you want to do is reconstruct what happened on site.
-              </p>
-              <p className="text-gray-400 text-lg leading-relaxed">
-                So logs get skipped. Details get fuzzy. And when disputes arise, you&apos;re digging through texts and trying to remember what happened three months ago.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-8 bg-gray-900 rounded-2xl border border-gray-800">
-              {[
-                { number: '45min', label: 'Average time per daily report' },
-                { number: '62%', label: 'Of supers skip logs when busy' },
-                { number: '$42K', label: 'Average cost of documentation disputes' },
-              ].map((stat, i) => (
-                <div key={i} className="text-center">
-                  <div className="font-display text-4xl font-bold text-fv-blue mb-2">{stat.number}</div>
-                  <div className="text-sm text-gray-500">{stat.label}</div>
-                </div>
-              ))}
+          {/* Center tagline */}
+          <div className="reveal text-center py-16">
+            <h2 className="font-display text-[clamp(2rem,5vw,4rem)] font-bold tracking-tight leading-tight mb-6">
+              Get Home Earlier.<br />
+              <span className="text-fv-blue">Build Better.</span>
+            </h2>
+            <div className="flex items-center justify-center gap-3 text-gray-500 text-sm">
+              <span className="w-8 h-px bg-white/10" />
+              <span className="font-display text-[10px] tracking-[0.3em] uppercase">Built for the field.</span>
+              <span className="w-8 h-px bg-white/10" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
-      <section id="how-it-works" className="py-24 px-6">
-        <div className="max-w-6xl mx-auto text-center">
-          <span className="font-display text-xs font-semibold uppercase tracking-widest text-fv-blue mb-4 block">
-            How It Works
-          </span>
-          <h2 className="font-display text-3xl md:text-4xl font-bold mb-16">
-            Three steps. Thirty seconds. Zero double-entry.
-          </h2>
-          <div className="grid md:grid-cols-3 gap-12 relative">
-            <div className="hidden md:block absolute top-16 left-[20%] right-[20%] h-0.5 bg-gradient-to-r from-gray-800 via-fv-blue to-gray-800" />
-            {[
-              {
-                num: 1,
-                icon: <CameraIcon />,
-                title: 'Walk & Capture',
-                desc: "Snap photos, record a video walkthrough, or talk as you go. Tag rooms as you capture. Mix and match — use whatever's fastest.",
-              },
-              {
-                num: 2,
-                icon: <ClockIcon />,
-                title: 'Generate',
-                desc: 'Tap one button. AI fuses your photos, video, voice, and notes into a structured daily report. Weather included automatically.',
-              },
-              {
-                num: 3,
-                icon: <SendIcon />,
-                title: 'Send',
-                desc: 'Review, edit if needed, then PDF, email, or share in one tap. Done before you leave the site.',
-              },
-            ].map((step, i) => (
-              <div key={i} className="relative p-8">
-                <div className="w-12 h-12 bg-gray-900 border-2 border-fv-blue rounded-full flex items-center justify-center font-display font-bold text-xl text-fv-blue mx-auto mb-6 relative z-10">
-                  {step.num}
-                </div>
-                <div className="w-20 h-20 bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-gray-700">
-                  {step.icon}
-                </div>
-                <h3 className="font-display text-xl font-semibold mb-3">{step.title}</h3>
-                <p className="text-gray-500 leading-relaxed">{step.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ═══ BUILDER ═══ */}
+      <section className="relative py-24 md:py-40 px-6 bg-fv-black">
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
 
-      {/* Features */}
-      <section className="py-24 px-6 bg-[#111]">
-        <div className="max-w-6xl mx-auto text-center">
-          <span className="font-display text-xs font-semibold uppercase tracking-widest text-fv-blue mb-4 block">
-            Features
-          </span>
-          <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
-            Everything you need. Nothing you don&apos;t.
-          </h2>
-          <p className="text-gray-500 mb-16">Built for superintendents, not IT departments.</p>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
-            {features.map((feature, i) => (
-              <div
-                key={i}
-                className="feature-card bg-gray-900 border border-gray-800 rounded-2xl p-8 transition-all duration-500 hover:-translate-y-1"
-              >
-                <div className="w-12 h-12 bg-gradient-to-br from-fv-blue to-fv-blue-dark rounded-xl flex items-center justify-center mb-6">
-                  {feature.icon}
-                </div>
-                <h3 className="font-display text-xl font-semibold mb-3">{feature.title}</h3>
-                <p className="text-gray-500 leading-relaxed mb-4">{feature.desc}</p>
-                <p className="text-gray-400 italic text-sm">&ldquo;{feature.quote}&rdquo;</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Builder Section */}
-      <section className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-3xl p-10 relative overflow-hidden">
-              <div className="absolute -top-1/2 -right-1/2 w-full h-full bg-[radial-gradient(circle,rgba(59,155,217,0.3)_0%,transparent_70%)] opacity-50" />
-              <div className="w-20 h-20 bg-fv-blue rounded-2xl flex items-center justify-center mb-8 relative">
+        <div className="max-w-4xl mx-auto">
+          <div className="reveal relative bg-white/[0.02] border border-white/[0.04] rounded-2xl md:rounded-3xl p-6 md:p-16 overflow-hidden">
+            <div className="absolute -top-20 -right-20 w-64 h-64 bg-fv-blue/[0.04] rounded-full blur-[100px]" />
+            <div className="mb-8">
+              <span className="font-display text-[10px] font-semibold tracking-[0.3em] uppercase text-fv-blue">The Builder</span>
+            </div>
+            <blockquote className="relative font-display text-lg md:text-3xl font-medium leading-relaxed text-white/90 mb-8 md:mb-10">
+              &ldquo;I&apos;ve spent too many evenings reconstructing what happened on site instead of being with my family. I built FieldVision because I needed it — and because every super I know needed it too.&rdquo;
+            </blockquote>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-fv-blue to-fv-blue-dark rounded-xl flex items-center justify-center shadow-lg shadow-fv-blue/20">
                 <HomeIcon />
               </div>
-              <p className="font-display text-2xl font-medium leading-relaxed relative text-white">
-                &ldquo;I&apos;ve spent too many evenings reconstructing what happened on site instead of being with my family. I built FieldVision because I needed it.&rdquo;
-              </p>
-            </div>
-            <div>
-              <span className="font-display text-xs font-semibold uppercase tracking-widest text-fv-blue mb-4 block">
-                Why FieldVision
-              </span>
-              <h2 className="font-display text-3xl md:text-4xl font-bold leading-tight mb-6">
-                Built by a GC who&apos;s done <span className="text-fv-blue">$40M+</span> in custom homes.
-              </h2>
-              <p className="text-gray-400 text-lg leading-relaxed mb-6">
-                FieldVision isn&apos;t another tech product from people who&apos;ve never set foot on a jobsite. It&apos;s built by someone who&apos;s run crews, managed custom home projects, and knows exactly how supers work.
-              </p>
-              <ul className="space-y-4">
-                {[
-                  'Designed for how builders actually work',
-                  'No complex setup or training required',
-                  "Works with the photos you're already taking",
-                  'AI trained on real construction workflows',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3 text-gray-400">
-                    <CheckIcon />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
+              <div>
+                <div className="font-display font-bold text-sm">Steven Fernandez</div>
+                <div className="text-gray-500 text-xs">Licensed GC &middot; $40M+ Custom Homes &middot; Founder</div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section id="download" className="py-24 px-6 text-center relative">
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[150%] h-full bg-[radial-gradient(ellipse_at_center_bottom,rgba(59,155,217,0.3)_0%,transparent_50%)] pointer-events-none" />
-        <div className="max-w-4xl mx-auto relative">
-          <span className="font-display text-xs font-semibold uppercase tracking-widest text-fv-blue mb-4 block">
-            Get Started
-          </span>
-          <h2 className="font-display text-3xl md:text-5xl font-bold mb-4">Get 30 minutes back. Every day.</h2>
-          <p className="text-gray-400 text-lg mb-10 max-w-lg mx-auto">
-            Download FieldVision free and experience AI-powered daily reports on your next project.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-            <a
-              href={APP_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 font-display font-semibold px-8 py-4 bg-fv-blue text-white rounded-lg hover:bg-fv-blue-dark hover:-translate-y-0.5 hover:shadow-[0_10px_40px_rgba(59,155,217,0.3)] transition-all"
-            >
-              <AppleIcon />
-              Download on App Store
-            </a>
-            <Link
-              href="/schedule"
-              className="flex items-center justify-center gap-2 font-display font-semibold px-8 py-4 bg-transparent text-white border border-gray-700 rounded-lg hover:border-fv-blue hover:text-fv-blue transition-all"
-            >
-              <CalendarIcon />
-              Try Schedule Maker
-            </Link>
-          </div>
-          <div className="flex flex-wrap justify-center gap-8 text-gray-500 text-sm">
-            <div className="flex items-center gap-2">
-              <PhoneIcon />
-              iOS App
+      {/* ═══ FINAL CTA ═══ */}
+      <section className="relative py-24 md:py-52 px-6 text-center bg-fv-black overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(59,155,217,0.06)_0%,transparent_50%)]" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-32 bg-gradient-to-b from-transparent via-fv-blue/20 to-transparent" />
+
+        <div className="max-w-3xl mx-auto relative">
+          <div className="reveal">
+            <h2 className="font-display text-[clamp(2.5rem,7vw,5.5rem)] font-bold tracking-tight leading-[0.95] mb-8">
+              Get 30 minutes back.<br />
+              <span className="bg-gradient-to-r from-fv-blue to-fv-blue-light bg-clip-text text-transparent">Every single day.</span>
+            </h2>
+            <p className="text-gray-400 text-xl mb-14 max-w-md mx-auto">
+              Your next daily report takes 30 seconds.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-5 justify-center mb-16">
+              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="font-display font-semibold px-8 md:px-14 py-4 md:py-5 bg-white text-black rounded-2xl text-base md:text-lg hover:shadow-[0_0_80px_rgba(255,255,255,0.12)] transition-all duration-500 flex items-center justify-center gap-3">
+                <AppleIcon /> Download on App Store
+              </a>
+              <Link href="/schedule" className="font-display font-semibold px-8 md:px-14 py-4 md:py-5 text-white border border-white/10 rounded-2xl text-base md:text-lg hover:bg-white/5 transition-all duration-500 text-center">
+                Try Schedule Maker
+              </Link>
             </div>
-            <div className="flex items-center gap-2">
-              <ShieldIcon />
-              Your Data Stays Private
-            </div>
-            <div className="flex items-center gap-2">
-              <HomeSmallIcon />
-              Built by a Licensed GC
+
+            <div className="flex flex-wrap justify-center gap-10 text-gray-600 text-sm">
+              <span className="flex items-center gap-2"><PhoneIcon /> iOS App</span>
+              <span className="flex items-center gap-2"><ShieldIcon /> Data Stays Private</span>
+              <span className="flex items-center gap-2"><HomeSmallIcon /> Licensed GC Built</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 px-6 border-t border-gray-800">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2 font-display font-semibold">
-            <div className="bg-white rounded-full p-1">
+      {/* ═══ FOOTER ═══ */}
+      <footer className="py-12 px-6 border-t border-white/[0.03] bg-fv-black">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2.5 font-display font-semibold text-sm tracking-tight">
+            <div className="bg-white rounded-xl p-1.5">
               <Image src="/logo_backup.png" alt="FieldVision" width={18} height={18} />
             </div>
-            <span>FieldVision AI</span>
+            FieldVision AI
           </div>
-          <div className="flex gap-6 text-sm text-gray-500">
-            <Link href="/privacy" className="hover:text-fv-blue transition-colors">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="hover:text-fv-blue transition-colors">
-              Terms of Service
-            </Link>
-            <a href="mailto:support@getfieldvision.ai" className="hover:text-fv-blue transition-colors">
-              Support
-            </a>
+          <div className="flex gap-8 text-sm text-gray-600">
+            <Link href="/privacy" className="hover:text-white transition-colors duration-300">Privacy</Link>
+            <Link href="/terms" className="hover:text-white transition-colors duration-300">Terms</Link>
+            <a href="mailto:support@getfieldvision.ai" className="hover:text-white transition-colors duration-300">Support</a>
           </div>
-          <p className="text-sm text-gray-500">© 2026 MyndAIX Inc.</p>
+          <p className="text-xs text-gray-700">© 2026 MyndAIX Inc.</p>
         </div>
       </footer>
-    </>
+    </div>
   );
 }
 
-// Features data
-const features = [
-  {
-    icon: <DocumentIcon />,
-    title: 'AI Daily Reports in 30 Seconds',
-    desc: 'Walk the site. Talk into your phone. Snap photos or record video as you go. FieldVision writes a professional daily report while you\'re still on site.',
-    quote: 'I used to spend an hour after work writing reports. Now it\'s done before I leave the jobsite.',
-  },
-  {
-    icon: <CameraIcon />,
-    title: 'Capture Your Way',
-    desc: 'Photos, video, voice notes, or typed text. Use one or all. Mention a punchlist item once—it auto-appears in your report, notes, AND todo list.',
-    quote: 'I snap photos, ramble into my phone, and everything ends up where it needs to be.',
-  },
-  {
-    icon: <ChatIcon />,
-    title: 'Ask the Field',
-    desc: 'Stuck on site? Ask about IRC egress requirements, HVAC budget, or when the inspection is. One AI that knows building codes AND your project details.',
-    quote: 'Like having a code expert and PM in my pocket. I ask it 10+ questions a day.',
-  },
-  {
-    icon: <MapPinIcon />,
-    title: 'Tag Rooms As You Go',
-    desc: 'Kitchen. Master bath. Garage. Tag photos and notes by location at capture time. Reports organize automatically by zone.',
-    quote: 'No more scrolling through 50 photos wondering which room it was.',
-  },
-  {
-    icon: <CloudIcon />,
-    title: 'Weather Built In',
-    desc: '7-day forecast for every jobsite. Alerts before bad weather hits. Conditions auto-included in every daily report.',
-    quote: "Know what's coming before it costs you.",
-  },
-  {
-    icon: <GlobeIcon />,
-    title: 'English & Spanish',
-    desc: 'Generate reports in both languages. Your crew reads Spanish, your PM reads English.',
-    quote: "Everyone's on the same page.",
-  },
-];
-
-// Icons
+// ─── Icons ───
 function AppleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none">
-      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" /></svg>;
 }
-
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none">
-      <circle cx="12" cy="12" r="10" />
-      <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" />
-    </svg>
-  );
-}
-
-function CameraIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="1.5" fill="none">
-      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-      <circle cx="12" cy="13" r="4" />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="1.5" fill="none">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 6v6l4 2" />
-    </svg>
-  );
-}
-
-function SendIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="1.5" fill="none">
-      <line x1="22" y1="2" x2="11" y2="13" />
-      <polygon points="22 2 15 22 11 13 2 9 22 2" />
-    </svg>
-  );
-}
-
-function DocumentIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="white" strokeWidth="2" fill="none">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-    </svg>
-  );
-}
-
-function ChatIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="white" strokeWidth="2" fill="none">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
-
-function MapPinIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="white" strokeWidth="2" fill="none">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
-  );
-}
-
-function CloudIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="white" strokeWidth="2" fill="none">
-      <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
-    </svg>
-  );
-}
-
-function GlobeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="white" strokeWidth="2" fill="none">
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-      <line x1="12" y1="22.08" x2="12" y2="12" />
-    </svg>
-  );
-}
-
 function HomeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="40" height="40" stroke="white" strokeWidth="1.5" fill="none">
-      <path d="M2 20h20M5 20V10l7-7 7 7v10M9 20v-6h6v6" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" width="20" height="20" stroke="white" strokeWidth="2" fill="none"><path d="M2 20h20M5 20V10l7-7 7 7v10M9 20v-6h6v6" /></svg>;
 }
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" stroke="#3B9BD9" strokeWidth="2" fill="none" className="flex-shrink-0 mt-0.5">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function MailIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none">
-      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-      <polyline points="22,6 12,13 2,6" />
-    </svg>
-  );
-}
-
 function PhoneIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="1.5" fill="none">
-      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-      <line x1="12" y1="18" x2="12.01" y2="18" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="1.5" fill="none"><rect x="5" y="2" width="14" height="20" rx="2" ry="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></svg>;
 }
-
 function ShieldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="1.5" fill="none">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="1.5" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>;
 }
-
 function HomeSmallIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="1.5" fill="none">
-      <path d="M2 20h20M5 20V10l7-7 7 7v10" />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="1.5" fill="none"><path d="M2 20h20M5 20V10l7-7 7 7v10" /></svg>;
 }
