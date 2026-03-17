@@ -3,95 +3,10 @@ import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
 import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
 import { parseSchedulePDFWithGemini } from '@/lib/ai/gemini';
 import { extractText } from 'unpdf';
+import { tryRegexExtract as tryRegexExtractShared } from '@/lib/pdf/regex-parser';
+import { extractTextServerSide } from '@/lib/pdf/server-extract';
 
 export const maxDuration = 60;
-
-// Month name to number mapping
-const MONTHS: Record<string, string> = {
-  Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
-  Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12',
-};
-
-// Add workdays to a date (skip weekends)
-function addWorkdays(start: Date, days: number): Date {
-  const result = new Date(start);
-  let added = 0;
-  while (added < days) {
-    result.setDate(result.getDate() + 1);
-    const dow = result.getDay();
-    if (dow !== 0 && dow !== 6) added++;
-  }
-  return result;
-}
-
-function formatDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-// Normalize extracted PDF text for regex matching
-// Strips control chars, normalizes whitespace, ensures proper line breaks
-function normalizeExtractedText(text: string): string {
-  return text
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Strip control chars (keep \n \r \t)
-    .replace(/\r\n?/g, '\n')     // Normalize line endings
-    .replace(/\f/g, '\n')        // Form feeds → newlines
-    .replace(/[ \t]+/g, ' ')     // Collapse horizontal whitespace
-    .replace(/ ?\n ?/g, '\n')    // Trim spaces around newlines
-    .replace(/\n{3,}/g, '\n\n')  // Collapse excessive blank lines
-    // Gantt PDF fix: rejoin "N\ndays" split across lines (Y-coord rounding artifact)
-    .replace(/(\d+)\ndays?\b/gi, '$1 days');
-}
-
-// Try to extract structured schedule data via regex (no AI needed)
-// Handles Gantt chart PDFs with "TaskName MonthName DD, YYYY N days" format
-function tryRegexExtract(rawText: string): Array<{
-  name: string; trade: string; duration_days: number; start_date: string; end_date: string;
-}> | null {
-  const text = normalizeExtractedText(rawText);
-  // Match line-by-line to avoid multiline regex exec() pitfalls with \s consuming newlines
-  // Pattern: task name, then month day year, then N day(s), then optional trailing text (bar label)
-  const linePattern = /^(.+?)\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d[\d ]*,?\s+\d{4})\s+(\d+)\s+days?(?:\s.*)?$/i;
-  const tasks: Array<{ name: string; trade: string; duration_days: number; start_date: string; end_date: string }> = [];
-  const seen = new Set<string>();
-
-  for (const line of text.split('\n')) {
-    const match = linePattern.exec(line);
-    if (!match) continue;
-
-    const rawName = match[1].trim().replace(/\s+/g, ' ');
-    const dateStr = match[2].replace(',', '');
-    const durationDays = parseInt(match[3], 10);
-
-    // Skip duplicates (Gantt PDFs repeat tasks at bottom)
-    const key = `${rawName}|${dateStr}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    // Skip non-task rows
-    if (/^title$/i.test(rawName) || /^start$/i.test(rawName) || /^workdays$/i.test(rawName)) continue;
-
-    // Parse start date — collapse split digits like "1 1" → "11"
-    const cleanDate = dateStr.replace(/(\d)\s+(\d)/g, '$1$2');
-    const dateParts = cleanDate.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})\s+(\d{4})/i);
-    if (!dateParts) continue;
-    const monthNum = MONTHS[dateParts[1].substring(0, 3)];
-    if (!monthNum) continue;
-    const startDate = new Date(`${dateParts[3]}-${monthNum}-${dateParts[2].padStart(2, '0')}`);
-    if (isNaN(startDate.getTime())) continue;
-
-    const endDate = addWorkdays(startDate, Math.max(1, durationDays));
-
-    tasks.push({
-      name: rawName,
-      trade: 'General', // Trade inference will happen at import step
-      duration_days: Math.max(1, durationDays),
-      start_date: formatDate(startDate),
-      end_date: formatDate(endDate),
-    });
-  }
-
-  return tasks.length >= 3 ? tasks : null; // Need at least 3 tasks to be confident
-}
 
 // Helper to verify project ownership
 async function verifyProjectOwnership(
@@ -132,6 +47,7 @@ export async function POST(
     geminiAttempts: 0,
     geminiError: '',
     textPreview: '',       // first 200 chars of best text (helps debug garbled extraction)
+    serverError: '',       // pdfjs-dist server extraction error (if any)
   };
 
   try {
@@ -172,89 +88,92 @@ export async function POST(
       return NextResponse.json({ error: 'File too large (max 10MB)', debug: diag }, { status: 400 });
     }
 
-    // Extract text from PDF
-    diag.step = 'server_extract';
+    // Extract text from PDF — multiple strategies, pick whichever yields regex matches
+    diag.step = 'extract';
     let pdfText = '';
-    let serverExtractFailed = false;
     const clientText = formData.get('text') as string || '';
     diag.clientTextLen = clientText.length;
 
-    // Skip slow server-side PDF extraction if client already sent good text
-    // unpdf can take 5-10s on complex Gantt PDFs, blowing the Vercel 10s limit
-    if (clientText.trim().length >= 200) {
-      console.log(`[ParseImport] Using client text (${clientText.length} chars) — skipping server extraction`);
-      pdfText = clientText;
-      diag.serverExtractOk = false;
-      diag.serverTextLen = 0;
-    } else {
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const { text, totalPages } = await extractText(arrayBuffer);
-        pdfText = Array.isArray(text) ? text.join('\n') : (text || '');
-        diag.serverTextLen = pdfText.length;
-        diag.serverExtractOk = true;
-        console.log(`[ParseImport] Server extracted ${pdfText.length} chars from ${totalPages} pages`);
-      } catch (pdfError) {
-        serverExtractFailed = true;
-        console.error('[ParseImport] Server PDF extraction failed:', pdfError);
-      }
-
-      // Use client text as fallback if server extraction failed or was too short
-      if (pdfText.trim().length < 50 && clientText.trim().length >= 50) {
-        console.log(`[ParseImport] Using client-side text (${clientText.length} chars) — server text too short`);
-        pdfText = clientText;
-      }
-    }
-
-    // Step 1: Try regex extraction on BOTH texts — pick whichever yields more tasks
-    diag.step = 'regex';
-    const regexTasksServer = pdfText.trim().length >= 50 ? tryRegexExtract(pdfText) : null;
-    const regexTasksClient = clientText.trim().length >= 50 ? tryRegexExtract(clientText) : null;
-
-    diag.regexServerTasks = regexTasksServer?.length ?? 0;
+    // Step 1: Try regex on client text first (fast, no extraction needed)
+    diag.step = 'regex_client';
+    const regexTasksClient = clientText.trim().length >= 50 ? tryRegexExtractShared(clientText) : null;
     diag.regexClientTasks = regexTasksClient?.length ?? 0;
 
-    console.log(`[ParseImport] Regex results — server: ${diag.regexServerTasks} tasks (${pdfText.length} chars), client: ${diag.regexClientTasks} tasks (${clientText.length} chars)`);
-
-    // Debug: log first 5 lines of normalized client text when regex fails
-    if (diag.regexServerTasks === 0 && diag.regexClientTasks === 0 && clientText.length > 0) {
-      const normalized = normalizeExtractedText(clientText);
-      const first5 = normalized.split('\n').slice(0, 5);
-      console.log(`[ParseImport] Regex failed — normalized client text first 5 lines:`, first5);
+    if (regexTasksClient && regexTasksClient.length > 0) {
+      diag.step = 'regex_client_success';
+      console.log(`[ParseImport] Client regex extracted ${regexTasksClient.length} tasks — done`);
+      return NextResponse.json({ tasks: regexTasksClient, debug: diag });
     }
 
-    if (diag.regexServerTasks > 0 || diag.regexClientTasks > 0) {
-      const bestTasks = diag.regexClientTasks > diag.regexServerTasks ? regexTasksClient! : regexTasksServer!;
-      const source = diag.regexClientTasks > diag.regexServerTasks ? 'client' : 'server';
-      diag.step = 'regex_success';
-      console.log(`[ParseImport] Regex extracted ${bestTasks.length} tasks from ${source} text — skipping Gemini`);
-      return NextResponse.json({ tasks: bestTasks, debug: diag });
+    console.log(`[ParseImport] Client regex: 0 tasks from ${clientText.length} chars — trying server extraction`);
+
+    // Step 2: Server-side pdfjs-dist extraction (Node.js produces cleaner text than browser)
+    // Browser pdfjs-dist extracts noisy calendar grid items that break regex matching.
+    // Node.js pdfjs-dist produces clean, structured text (1200 chars vs 5000+ in browser).
+    diag.step = 'pdfjs_server';
+    let pdfjsText = '';
+    const arrayBuffer = await file.arrayBuffer();
+
+    try {
+      pdfjsText = await extractTextServerSide(arrayBuffer);
+      diag.serverTextLen = pdfjsText.length;
+      diag.serverExtractOk = true;
+      console.log(`[ParseImport] Server pdfjs-dist extracted ${pdfjsText.length} chars`);
+    } catch (pdfjsError) {
+      const errMsg = pdfjsError instanceof Error ? pdfjsError.message : String(pdfjsError);
+      diag.serverError = errMsg;
+      console.error('[ParseImport] Server pdfjs-dist extraction failed:', errMsg);
     }
 
-    // If neither regex worked but we have client text, prefer it for AI parsing
-    if (clientText.trim().length > pdfText.trim().length) {
-      console.log(`[ParseImport] Using longer client text for Gemini (${clientText.length} vs ${pdfText.length} chars)`);
-      pdfText = clientText;
+    // Try regex on server-extracted text
+    const regexTasksPdfjs = pdfjsText.trim().length >= 50 ? tryRegexExtractShared(pdfjsText) : null;
+    diag.regexServerTasks = regexTasksPdfjs?.length ?? 0;
+
+    if (regexTasksPdfjs && regexTasksPdfjs.length > 0) {
+      diag.step = 'regex_server_success';
+      console.log(`[ParseImport] Server regex extracted ${regexTasksPdfjs.length} tasks — done`);
+      return NextResponse.json({ tasks: regexTasksPdfjs, debug: diag });
     }
+
+    console.log(`[ParseImport] Server regex: 0 tasks from ${pdfjsText.length} chars — trying unpdf fallback`);
+
+    // Step 3: unpdf fallback (different extraction engine, may work for non-Gantt PDFs)
+    diag.step = 'unpdf_server';
+    let unpdfText = '';
+    try {
+      const { text, totalPages } = await extractText(arrayBuffer);
+      unpdfText = Array.isArray(text) ? text.join('\n') : (text || '');
+      console.log(`[ParseImport] unpdf extracted ${unpdfText.length} chars from ${totalPages} pages`);
+    } catch (unpdfError) {
+      console.error('[ParseImport] unpdf extraction failed:', unpdfError);
+    }
+
+    const regexTasksUnpdf = unpdfText.trim().length >= 50 ? tryRegexExtractShared(unpdfText) : null;
+    if (regexTasksUnpdf && regexTasksUnpdf.length > 0) {
+      diag.step = 'regex_unpdf_success';
+      diag.regexServerTasks = regexTasksUnpdf.length;
+      console.log(`[ParseImport] unpdf regex extracted ${regexTasksUnpdf.length} tasks — done`);
+      return NextResponse.json({ tasks: regexTasksUnpdf, debug: diag });
+    }
+
+    // Pick the best text for Gemini fallback
+    pdfText = [pdfjsText, unpdfText, clientText]
+      .sort((a, b) => b.trim().length - a.trim().length)[0] || '';
 
     diag.textPreview = pdfText.trim().slice(0, 200);
 
     if (!pdfText || pdfText.trim().length < 50) {
       diag.step = 'text_too_short';
-      const reason = serverExtractFailed
-        ? 'Server-side PDF parsing failed.'
-        : `Only extracted ${pdfText.trim().length} characters.`;
-      const hasClientText = clientText.trim().length > 0;
       return NextResponse.json({
-        error: `Could not extract readable text from PDF. ${reason}${hasClientText ? ' Client fallback also insufficient.' : ''} This may be a scanned/image-based PDF — try exporting from your scheduling software as CSV or Excel instead.`,
+        error: `Could not extract readable text from PDF. Only extracted ${pdfText.trim().length} characters. This may be a scanned/image-based PDF — try exporting from your scheduling software as CSV or Excel instead.`,
         tasks: [],
         debug: diag,
       }, { status: 400 });
     }
 
-    console.log('[ParseImport] Regex found no structured tasks — falling back to Gemini');
+    console.log('[ParseImport] All regex strategies failed — falling back to Gemini');
 
-    // Step 2: Fall back to Gemini AI parsing
+    // Step 4: Fall back to Gemini AI parsing
     // Single attempt with 8s timeout — Vercel Hobby caps functions at 10s
     diag.step = 'gemini';
     diag.geminiAttempts = 1;

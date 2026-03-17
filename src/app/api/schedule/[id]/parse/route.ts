@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
+import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
 import { parseContractPDFWithGemini } from '@/lib/ai/gemini';
 import { extractText } from 'unpdf';
 
@@ -57,8 +58,7 @@ export async function POST(
     const { id } = await params;
     console.log(`[Parse] Project ID: ${id}`);
 
-    // TODO: Add Clerk auth when ready for user accounts
-    const userId = null; // Disabled for MVP
+    const userId = await getAuthUserId();
     const anonymousId = request.headers.get('x-anonymous-id');
     console.log(`[Parse] Anonymous ID present: ${!!anonymousId}`);
 
@@ -70,6 +70,7 @@ export async function POST(
     }
 
     const supabase = createServerClient();
+    await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
     console.log(`[Parse] Supabase client created at ${Date.now() - startTime}ms`);
 
     // Verify ownership

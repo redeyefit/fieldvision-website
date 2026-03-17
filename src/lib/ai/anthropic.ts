@@ -555,8 +555,177 @@ If the enrichment includes warnings about missing items, consider adding them if
   };
 }
 
+// ─── Import Mode: AI Dependency Inference ─────────────────────────────────────
+
+const INFER_DEPENDENCIES_TOOL = {
+  name: 'infer_dependencies',
+  description: 'Infer construction task dependencies from task names, trades, and dates',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      tasks: {
+        type: 'array' as const,
+        items: {
+          type: 'object' as const,
+          properties: {
+            index: {
+              type: 'number' as const,
+              description: '0-based index of this task in the input list',
+            },
+            depends_on_indices: {
+              type: 'array' as const,
+              items: { type: 'number' as const },
+              description: 'Indices of tasks this depends on (0-based, must be < current index)',
+            },
+            trade: {
+              type: 'string' as const,
+              enum: TRADE_CATEGORIES,
+              description: 'Corrected trade category if the original seems wrong',
+            },
+          },
+          required: ['index', 'depends_on_indices'],
+        },
+      },
+    },
+    required: ['tasks'],
+  },
+};
+
 /**
- * Ask the Field - answer questions about the schedule (read-only)
+ * Infer dependencies for imported tasks based on names, trades, and dates.
+ * Used in Import Mode — user dates are preserved, only dependencies are AI-generated.
+ */
+export async function inferDependencies(
+  tasks: Array<{
+    name: string;
+    trade: string;
+    duration_days: number;
+    start_date: string;
+    end_date: string;
+  }>
+): Promise<Array<{
+  index: number;
+  depends_on_indices: number[];
+  trade?: string;
+}>> {
+  const taskList = tasks
+    .map((t, i) => `${i}. [${t.trade}] "${t.name}" — ${t.duration_days} days (${t.start_date} → ${t.end_date})`)
+    .join('\n');
+
+  const systemPrompt = `You are a construction scheduling expert. You are given an IMPORTED schedule where the user has already set dates and durations. Your job is ONLY to infer logical dependencies between tasks.
+
+RULES:
+1. PRESERVE the user's sequence — do NOT reorder tasks
+2. Infer dependencies based on construction logic:
+   - Demo before framing
+   - Framing before rough-ins (MEP)
+   - Rough-ins (plumbing, electrical, HVAC) can be PARALLEL — they do NOT depend on each other
+   - Insulation after rough-ins
+   - Drywall after insulation
+   - Paint after drywall
+   - Cabinets after paint (or concurrent in different areas)
+   - Countertops after cabinets
+   - Flooring near end
+   - Finals/testing last
+3. Only set dependencies for TRUE blockers — if task B cannot physically start without task A completing
+4. Look at the dates — if two tasks overlap in time, they're likely parallel (no dependency between them)
+5. depends_on_indices must reference tasks with LOWER indices (earlier in the list)
+6. If a trade looks wrong, correct it in the trade field. Otherwise omit trade.
+
+IMPORTANT: Return ALL tasks, even ones with no dependencies (empty depends_on_indices array).`;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 8192,
+    temperature: 0,
+    system: systemPrompt,
+    tools: [INFER_DEPENDENCIES_TOOL],
+    tool_choice: { type: 'tool', name: 'infer_dependencies' },
+    messages: [
+      {
+        role: 'user',
+        content: `Infer dependencies for these ${tasks.length} imported tasks. Only set TRUE construction blockers. Parallel trades (like MEP rough-ins) should NOT depend on each other.\n\nTasks:\n${taskList}`,
+      },
+    ],
+  });
+
+  const toolUse = response.content.find((block) => block.type === 'tool_use');
+  if (!toolUse || toolUse.type !== 'tool_use') {
+    console.error('[Anthropic] inferDependencies: No tool_use block');
+    // Return empty dependencies for all tasks as fallback
+    return tasks.map((_, i) => ({ index: i, depends_on_indices: [] }));
+  }
+
+  const result = toolUse.input as {
+    tasks: Array<{
+      index: number;
+      depends_on_indices: number[];
+      trade?: string;
+    }>;
+  };
+
+  return result.tasks;
+}
+
+const MODIFY_SCHEDULE_TOOL = {
+  name: 'modify_schedule',
+  description: 'Modify the construction schedule by adding, updating, or deleting tasks. Only use this when the user explicitly asks to change the schedule (e.g., "add a task", "change duration", "remove task X"). Do NOT use for questions, explanations, or suggestions.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      reasoning: {
+        type: 'string' as const,
+        description: 'Brief explanation of why these changes make sense from a construction perspective',
+      },
+      operations: {
+        type: 'array' as const,
+        items: {
+          type: 'object' as const,
+          properties: {
+            action: {
+              type: 'string' as const,
+              enum: ['add', 'update', 'delete'],
+              description: 'The type of modification',
+            },
+            task_name: {
+              type: 'string' as const,
+              description: 'For update/delete: the EXACT name of an existing task. For add: the name of the new task.',
+            },
+            name: {
+              type: 'string' as const,
+              description: 'New name for the task (for add or rename)',
+            },
+            trade: {
+              type: 'string' as const,
+              enum: TRADE_CATEGORIES,
+              description: 'Trade category (for add or update)',
+            },
+            duration_days: {
+              type: 'number' as const,
+              minimum: 1,
+              maximum: 120,
+              description: 'Duration in workdays (for add or update)',
+            },
+            depends_on_names: {
+              type: 'array' as const,
+              items: { type: 'string' as const },
+              description: 'Names of tasks this depends on (for add or update). Use EXACT task names from the schedule.',
+            },
+            insert_after: {
+              type: 'string' as const,
+              description: 'For add: name of the task to insert after. The new task will also depend on this task by default.',
+            },
+          },
+          required: ['action', 'task_name'],
+        },
+      },
+    },
+    required: ['reasoning', 'operations'],
+  },
+};
+
+/**
+ * Ask the Field - answer questions about the schedule (read-only, backward compat)
  */
 export async function askTheField(
   question: string,
@@ -581,7 +750,7 @@ ${context.tasks.map((t, i) => `${i + 1}. ${t.name} (${t.trade}) - ${t.duration_d
 Be concise and practical. Speak like an experienced superintendent.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514', // Sonnet for expert construction reasoning
+    model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
     system: systemPrompt,
     messages: [
@@ -594,4 +763,131 @@ Be concise and practical. Speak like an experienced superintendent.`;
 
   const textBlock = response.content.find((block) => block.type === 'text');
   return textBlock && textBlock.type === 'text' ? textBlock.text : 'Unable to process question.';
+}
+
+export type AskTheFieldToolResult = {
+  type: 'text';
+  answer: string;
+} | {
+  type: 'modification';
+  answer: string;
+  reasoning: string;
+  operations: Array<{
+    action: 'add' | 'update' | 'delete';
+    task_name: string;
+    name?: string;
+    trade?: string;
+    duration_days?: number;
+    depends_on_names?: string[];
+    insert_after?: string;
+  }>;
+}
+
+/**
+ * Ask the Field with tool use — Claude decides whether to answer with text
+ * or propose schedule modifications via the modify_schedule tool.
+ */
+export async function askTheFieldWithTools(
+  question: string,
+  context: {
+    tasks: Array<{
+      name: string;
+      trade: string;
+      duration_days: number;
+      start_date: string;
+      end_date: string;
+      depends_on_names: string[];
+    }>;
+    projectName: string;
+  }
+): Promise<AskTheFieldToolResult> {
+  const taskList = context.tasks
+    .map((t, i) => {
+      const deps = t.depends_on_names.length > 0
+        ? ` [depends on: ${t.depends_on_names.join(', ')}]`
+        : '';
+      return `${i + 1}. "${t.name}" (${t.trade}) - ${t.duration_days} days, ${t.start_date} to ${t.end_date}${deps}`;
+    })
+    .join('\n');
+
+  const systemPrompt = `You are "Ask the Field" - a construction scheduling assistant for "${context.projectName}".
+
+You have TWO modes:
+1. **Answer mode** (default): Answer questions, explain the schedule, suggest improvements. Respond with text.
+2. **Modify mode**: When the user EXPLICITLY asks you to add, remove, update, or change tasks, use the modify_schedule tool.
+
+WHEN TO USE THE TOOL:
+- "Add a cabinets task after painting" → USE TOOL
+- "Change drywall to 12 days" → USE TOOL
+- "Remove the test task" → USE TOOL
+- "Move framing before demo" → USE TOOL (update dependencies)
+
+WHEN TO ANSWER WITH TEXT:
+- "What's missing?" → TEXT (suggest, don't modify)
+- "Why is drywall 15 days?" → TEXT
+- "Is this schedule realistic?" → TEXT
+- "What should I change?" → TEXT
+
+CRITICAL RULES FOR MODIFICATIONS:
+- Use EXACT task names from the schedule below
+- Task names are case-sensitive — match them precisely
+- For depends_on_names, use exact task names
+- Duration must be 1-120 workdays
+- You can batch multiple operations in one tool call
+
+Current schedule (${context.tasks.length} tasks):
+${taskList}
+
+Be concise and practical. Speak like an experienced superintendent.`;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 2048,
+    system: systemPrompt,
+    tools: [MODIFY_SCHEDULE_TOOL],
+    tool_choice: { type: 'auto' },
+    messages: [
+      {
+        role: 'user',
+        content: question,
+      },
+    ],
+  });
+
+  // Check if Claude used the tool
+  const toolUse = response.content.find((block) => block.type === 'tool_use');
+  if (toolUse && toolUse.type === 'tool_use' && toolUse.name === 'modify_schedule') {
+    const input = toolUse.input as {
+      reasoning: string;
+      operations: Array<{
+        action: 'add' | 'update' | 'delete';
+        task_name: string;
+        name?: string;
+        trade?: string;
+        duration_days?: number;
+        depends_on_names?: string[];
+        insert_after?: string;
+      }>;
+    };
+
+    // Also extract any text Claude said alongside the tool call
+    const textBlock = response.content.find((block) => block.type === 'text');
+    const answer = textBlock && textBlock.type === 'text'
+      ? textBlock.text
+      : input.reasoning;
+
+    return {
+      type: 'modification',
+      answer,
+      reasoning: input.reasoning,
+      operations: input.operations,
+    };
+  }
+
+  // Text-only response
+  const textBlock = response.content.find((block) => block.type === 'text');
+  return {
+    type: 'text',
+    answer: textBlock && textBlock.type === 'text' ? textBlock.text : 'Unable to process question.',
+  };
 }

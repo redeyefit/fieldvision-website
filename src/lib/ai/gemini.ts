@@ -95,6 +95,88 @@ ${pdfText}`;
 }
 
 /**
+ * Parse an existing schedule PDF and extract tasks with their dates preserved
+ * Used by Import mode — NOT for contract parsing (that's parseContractPDFWithGemini)
+ */
+export async function parseSchedulePDFWithGemini(
+  pdfText: string
+): Promise<{
+  tasks: Array<{
+    name: string;
+    trade: string;
+    duration_days: number;
+    start_date: string;
+    end_date: string;
+  }>;
+}> {
+  console.log('[Gemini] parseSchedulePDF called, text length:', pdfText.length);
+
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0,
+      maxOutputTokens: 8192,
+    },
+  });
+
+  const tradeList = TRADE_CATEGORIES.join(', ');
+
+  const prompt = `You are a construction scheduling expert. Extract ALL tasks/activities from this construction schedule, preserving the EXACT dates as written.
+
+RULES:
+1. Extract every task/activity with its name, start date, and end date
+2. PRESERVE the original dates exactly as they appear — do NOT recalculate or adjust
+3. Categorize each task by trade from this list: ${tradeList}
+4. Calculate duration_days as workdays between start and end dates (exclude weekends)
+5. If only a start date exists, estimate a reasonable end date based on the task type
+6. If only an end date exists, estimate a reasonable start date based on the task type
+7. Dates must be in YYYY-MM-DD format
+8. Skip summary rows, headers, milestones with no work, and section dividers
+9. Include ALL actual construction activities — be thorough
+
+Return a JSON object with this exact structure:
+{
+  "tasks": [
+    {
+      "name": "Task name",
+      "trade": "Trade category from the list",
+      "duration_days": 5,
+      "start_date": "2025-03-01",
+      "end_date": "2025-03-07"
+    }
+  ]
+}
+
+SCHEDULE TEXT:
+${pdfText}`;
+
+  try {
+    console.log('[Gemini] Calling Gemini API for schedule PDF parsing...');
+    const startTime = Date.now();
+
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+
+    const elapsed = Date.now() - startTime;
+    console.log('[Gemini] Schedule PDF parsed in', elapsed, 'ms');
+
+    const parsed = JSON.parse(text);
+
+    console.log('[Gemini] Extracted', parsed.tasks?.length || 0, 'schedule tasks');
+    if (parsed.tasks?.length > 0) {
+      console.log('[Gemini] First task:', JSON.stringify(parsed.tasks[0]));
+    }
+
+    return parsed;
+  } catch (error) {
+    console.error('[Gemini] Schedule PDF parse error:', error);
+    throw error;
+  }
+}
+
+/**
  * Generate schedule from line items using Gemini Flash
  * Compare against Claude Sonnet for quality
  */

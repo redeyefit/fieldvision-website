@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, generateAnonymousId, verifyAnonymousId } from '@/lib/supabase/client';
+import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
 import { Project, CreateProjectRequest } from '@/lib/supabase/types';
+
+const FREE_PROJECT_LIMIT = 3;
 
 // CORS headers helper
 function corsHeaders() {
@@ -23,8 +26,7 @@ export async function OPTIONS() {
 // GET /api/schedule - List user's projects
 export async function GET(request: NextRequest) {
   try {
-    // TODO: Add Clerk auth when ready for user accounts
-    const userId = null; // Disabled for MVP
+    const userId = await getAuthUserId();
     const anonymousId = request.headers.get('x-anonymous-id');
 
     if (!userId && !anonymousId) {
@@ -32,6 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createServerClient();
+    await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     let query = supabase.from('projects').select('*').order('updated_at', { ascending: false });
 
@@ -60,8 +63,7 @@ export async function GET(request: NextRequest) {
 // POST /api/schedule - Create new project
 export async function POST(request: NextRequest) {
   try {
-    // TODO: Add Clerk auth when ready for user accounts
-    const userId = null; // Disabled for MVP
+    const userId = await getAuthUserId();
     let anonymousId = request.headers.get('x-anonymous-id');
 
     // Generate anonymous ID if not authenticated and none provided
@@ -81,6 +83,28 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServerClient();
+    await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
+
+    // Enforce free tier project limit
+    let countQuery = supabase.from('projects').select('id', { count: 'exact', head: true });
+    if (userId) {
+      countQuery = countQuery.eq('user_id', userId);
+    } else if (anonymousId) {
+      countQuery = countQuery.eq('anonymous_id', anonymousId);
+    }
+    const { count } = await countQuery;
+
+    if (count !== null && count >= FREE_PROJECT_LIMIT) {
+      return NextResponse.json(
+        {
+          error: 'Project limit reached',
+          message: `Free accounts can create up to ${FREE_PROJECT_LIMIT} projects. Upgrade to Pro for unlimited projects.`,
+          limit: FREE_PROJECT_LIMIT,
+          current: count,
+        },
+        { status: 403, headers: corsHeaders() }
+      );
+    }
 
     const projectData: Partial<Project> = {
       name: body.name,

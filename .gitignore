@@ -18,3 +18,7 @@ scripts/video/src/*.mp4
 scripts/video/src/*.mp3
 scripts/video/build/
 .env.vercel
+
+# pdfjs-dist assets (copied from node_modules via postinstall)
+public/cmaps/
+public/standard_fonts/

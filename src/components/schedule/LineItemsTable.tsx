@@ -18,11 +18,12 @@ export function LineItemsTable({ items, onUpdate, onConfirmAll, disabled }: Line
 
   const confirmedCount = items.filter((i) => i.confirmed).length;
 
-  const handleToggleConfirm = useCallback(async (id: string) => {
+  const handleToggleConfirm = useCallback((id: string) => {
     const updated = items.map((item) =>
       item.id === id ? { ...item, confirmed: !item.confirmed } : item
     );
-    await onUpdate(updated);
+    // Fire-and-forget — state updates immediately in useSchedule, network syncs in background
+    onUpdate(updated);
   }, [items, onUpdate]);
 
   const handleStartEdit = useCallback((item: LineItem) => {
@@ -88,7 +89,7 @@ export function LineItemsTable({ items, onUpdate, onConfirmAll, disabled }: Line
           <div
             key={item.id}
             className={`
-              p-3 rounded-lg border transition-colors
+              p-3 rounded-lg border
               ${item.confirmed ? 'bg-green-900/20 border-green-800/50' : 'bg-fv-gray-800 border-fv-gray-700'}
             `}
           >
@@ -134,7 +135,7 @@ export function LineItemsTable({ items, onUpdate, onConfirmAll, disabled }: Line
                   onClick={() => handleToggleConfirm(item.id)}
                   disabled={disabled}
                   className={`
-                    mt-0.5 w-5 h-5 rounded border flex items-center justify-center transition-colors
+                    mt-0.5 w-5 h-5 rounded border flex items-center justify-center
                     ${item.confirmed ? 'bg-green-600 border-green-600' : 'border-fv-gray-600 hover:border-fv-blue'}
                     disabled:opacity-50
                   `}

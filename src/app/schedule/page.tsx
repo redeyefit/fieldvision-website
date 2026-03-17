@@ -193,6 +193,12 @@ function ScheduleDashboard() {
         body: JSON.stringify({ name: 'Untitled Project' }),
       });
 
+      if (res.status === 403) {
+        const errData = await res.json();
+        setError(errData.message || 'Project limit reached. Upgrade to Pro for unlimited projects.');
+        return;
+      }
+
       if (!res.ok) throw new Error('Failed to create project');
 
       const data = await res.json();
@@ -858,7 +864,12 @@ function ScheduleEditor({ projectIdFromUrl }: { projectIdFromUrl?: string }) {
           const { extractTextFromPdfDocument } = await import('@/lib/pdf/extract-text');
           setupPdfWorker(pdfjsLib);
           const arrayBuffer = await file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          const pdf = await pdfjsLib.getDocument({
+            data: arrayBuffer,
+            // NO CMaps — they decode calendar grid noise (day numbers, weekday
+            // letters) that buries task data. Without CMaps, extraction is clean
+            // (~1200 chars, 9 tasks) vs noisy (~5000 chars, 0 regex matches).
+          }).promise;
           clientText = await extractTextFromPdfDocument(pdf, 100_000);
           console.log(`[PDF Import] Client extracted ${clientText.length} chars`);
         } catch (pdfErr) {

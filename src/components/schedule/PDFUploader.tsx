@@ -1,8 +1,7 @@
 'use client';
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import * as pdfjsLib from 'pdfjs-dist';
 
 interface PDFUploaderProps {
   onUpload: (file: File, text: string) => Promise<void>;
@@ -10,43 +9,22 @@ interface PDFUploaderProps {
   pdfUrl?: string | null;
 }
 
-// Configure pdf.js worker
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-}
-
-// Extract text from PDF using pdf.js
+// Extract text from PDF using pdf.js with proper line reconstruction
 async function extractTextFromPDF(file: File): Promise<string> {
   try {
+    const pdfjsLib = await import('pdfjs-dist');
+    const { setupPdfWorker } = await import('@/lib/pdf/worker-setup');
+    const { extractTextFromPdfDocument } = await import('@/lib/pdf/extract-text');
+    setupPdfWorker(pdfjsLib);
+
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-    let fullText = '';
-    const numPages = pdf.numPages;
+    console.log(`[PDFUploader] Extracting text from ${pdf.numPages} pages`);
+    const text = await extractTextFromPdfDocument(pdf, 100_000);
+    console.log(`[PDFUploader] Extracted ${text.length} characters from PDF`);
 
-    console.log(`[PDFUploader] Extracting text from ${numPages} pages`);
-
-    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-
-      const pageText = textContent.items
-        .map((item) => {
-          if ('str' in item) {
-            return item.str;
-          }
-          return '';
-        })
-        .join(' ');
-
-      fullText += pageText + '\n\n';
-    }
-
-    // Clean up whitespace
-    fullText = fullText.replace(/\s+/g, ' ').trim();
-    console.log(`[PDFUploader] Extracted ${fullText.length} characters from PDF`);
-
-    return fullText;
+    return text;
   } catch (err) {
     console.error('[PDFUploader] PDF extraction failed:', err);
     return '';

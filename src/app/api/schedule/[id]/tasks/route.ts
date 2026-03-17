@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
+import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
 import { recalculateTasks } from '@/lib/schedule/workdays';
 
 // Helper to verify project ownership
@@ -30,8 +31,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    // TODO: Add Clerk auth when ready for user accounts
-    const userId = null; // Disabled for MVP
+    const userId = await getAuthUserId();
     const anonymousId = request.headers.get('x-anonymous-id');
 
     if (!userId && !anonymousId) {
@@ -39,6 +39,7 @@ export async function PATCH(
     }
 
     const supabase = createServerClient();
+    await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
     const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
@@ -75,11 +76,37 @@ export async function PATCH(
       );
     }
 
-    // Update each task
+    // Get existing task IDs so we can detect deletions
+    const { data: existingTasks } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('project_id', id);
+
+    const incomingIds = new Set(finalTasks.map((t: { id: string }) => t.id));
+    const existingIds = (existingTasks || []).map((t) => t.id);
+
+    // Delete tasks that are no longer in the client's list
+    const toDelete = existingIds.filter((eid) => !incomingIds.has(eid));
+    if (toDelete.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('tasks')
+        .delete()
+        .in('id', toDelete)
+        .eq('project_id', id);
+
+      if (deleteError) {
+        console.error('Delete error:', deleteError);
+        return NextResponse.json({ error: 'Failed to delete tasks' }, { status: 500 });
+      }
+    }
+
+    // Upsert each task (insert new ones, update existing ones)
     for (const task of finalTasks) {
       const { error } = await supabase
         .from('tasks')
-        .update({
+        .upsert({
+          id: task.id,
+          project_id: id,
           name: task.name,
           trade: task.trade,
           duration_days: task.duration_days,
@@ -87,12 +114,10 @@ export async function PATCH(
           end_date: task.end_date,
           depends_on: task.depends_on,
           sequence_index: task.sequence_index,
-        })
-        .eq('id', task.id)
-        .eq('project_id', id);
+        });
 
       if (error) {
-        console.error('Update error:', error);
+        console.error('Upsert error:', error);
         return NextResponse.json({ error: 'Failed to update tasks' }, { status: 500 });
       }
     }

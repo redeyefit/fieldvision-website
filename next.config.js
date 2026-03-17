@@ -1,12 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Set Turbopack root to this directory (fixes workspace root detection)
-  turbopack: {
-    root: __dirname,
-  },
-
   // Output static files for existing pages during transition
   trailingSlash: false,
+
+  // pdfjs-dist must NOT be bundled by webpack — its Node.js legacy build
+  // needs to run as a real Node.js require in serverless functions
+  // (Next.js 14 requires this under 'experimental')
+  experimental: {
+    serverComponentsExternalPackages: ['pdfjs-dist'],
+  },
 
   // Optimize images
   images: {

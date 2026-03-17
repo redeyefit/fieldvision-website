@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
+import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
 
 // Helper to verify project ownership
 async function verifyProjectOwnership(
@@ -29,8 +30,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    // TODO: Add Clerk auth when ready for user accounts
-    const userId = null; // Disabled for MVP
+    const userId = await getAuthUserId();
     const anonymousId = request.headers.get('x-anonymous-id');
 
     if (!userId && !anonymousId) {
@@ -38,6 +38,7 @@ export async function PATCH(
     }
 
     const supabase = createServerClient();
+    await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
     const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
@@ -94,8 +95,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    // TODO: Add Clerk auth when ready for user accounts
-    const userId = null; // Disabled for MVP
+    const userId = await getAuthUserId();
     const anonymousId = request.headers.get('x-anonymous-id');
 
     if (!userId && !anonymousId) {
@@ -103,6 +103,7 @@ export async function DELETE(
     }
 
     const supabase = createServerClient();
+    await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
     const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);

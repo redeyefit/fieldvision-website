@@ -1,17 +1,25 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { ValidatedOperation, AskResponse } from '@/lib/supabase/types';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  modification?: {
+    reasoning: string;
+    operations: ValidatedOperation[];
+    warnings: string[];
+  };
+  modificationApplied?: boolean;
 }
 
 interface AskTheFieldProps {
   isOpen: boolean;
   onToggle: () => void;
-  onAskProject: (question: string) => Promise<string>;
+  onAskProject: (question: string) => Promise<AskResponse>;
   onAskGeneral: (question: string) => Promise<string>;
+  onApplyModification: (operations: ValidatedOperation[]) => Promise<void>;
   disabled?: boolean;
 }
 
@@ -22,10 +30,120 @@ const PROMPT_CHIPS = [
   { label: 'Best practices', prompt: 'What are best practices for this type of project scheduling?' },
 ];
 
-export function AskTheField({ isOpen, onToggle, onAskProject, onAskGeneral, disabled }: AskTheFieldProps) {
+function ModificationCard({
+  modification,
+  applied,
+  applying,
+  onApply,
+  onDismiss,
+}: {
+  modification: NonNullable<Message['modification']>;
+  applied?: boolean;
+  applying: boolean;
+  onApply: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="bg-fv-gray-800/80 border border-fv-gray-600 rounded-lg p-3 space-y-2">
+      {/* Reasoning */}
+      <p className="text-xs text-fv-gray-300 italic">{modification.reasoning}</p>
+
+      {/* Operations */}
+      <div className="space-y-1">
+        {modification.operations.map((op, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs">
+            {op.action === 'add' && (
+              <>
+                <span className="text-green-400 font-mono font-bold shrink-0">+</span>
+                <span className="text-green-300">
+                  Add &ldquo;{op.task_name}&rdquo;
+                  {op.changes.duration_days && ` (${op.changes.duration_days.to} days)`}
+                  {op.changes.trade && ` [${op.changes.trade.to}]`}
+                </span>
+              </>
+            )}
+            {op.action === 'update' && (
+              <>
+                <span className="text-yellow-400 font-mono font-bold shrink-0">~</span>
+                <span className="text-yellow-300">
+                  Update &ldquo;{op.task_name}&rdquo;:{' '}
+                  {Object.entries(op.changes).map(([key, change], j) => (
+                    <span key={key}>
+                      {j > 0 && ', '}
+                      {key} {String(change.from)} &rarr; {String(change.to)}
+                    </span>
+                  ))}
+                </span>
+              </>
+            )}
+            {op.action === 'delete' && (
+              <>
+                <span className="text-red-400 font-mono font-bold shrink-0">&minus;</span>
+                <span className="text-red-300">
+                  Remove &ldquo;{op.task_name}&rdquo;
+                </span>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Warnings */}
+      {modification.warnings.length > 0 && (
+        <div className="space-y-0.5">
+          {modification.warnings.map((w, i) => (
+            <p key={i} className="text-xs text-amber-400/80 flex items-start gap-1">
+              <span className="shrink-0">&#9888;</span>
+              <span>{w}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Actions */}
+      {applied === undefined && (
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onApply}
+            disabled={applying}
+            className="flex-1 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+          >
+            {applying ? (
+              <>
+                <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Applying...
+              </>
+            ) : (
+              'Apply Changes'
+            )}
+          </button>
+          <button
+            onClick={onDismiss}
+            disabled={applying}
+            className="px-3 py-1.5 bg-fv-gray-700 hover:bg-fv-gray-600 text-fv-gray-300 text-xs font-medium rounded disabled:opacity-50 transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      {applied === true && (
+        <p className="text-xs text-green-400 font-medium pt-1">Changes applied</p>
+      )}
+      {applied === false && (
+        <p className="text-xs text-fv-gray-500 pt-1">Dismissed</p>
+      )}
+    </div>
+  );
+}
+
+export function AskTheField({ isOpen, onToggle, onAskProject, onAskGeneral, onApplyModification, disabled }: AskTheFieldProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [applyingIndex, setApplyingIndex] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -36,7 +154,35 @@ export function AskTheField({ isOpen, onToggle, onAskProject, onAskGeneral, disa
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Ask about this specific project (uses Claude with project context)
+  // Handle applying a modification
+  const handleApply = useCallback(async (messageIndex: number) => {
+    const message = messages[messageIndex];
+    if (!message?.modification) return;
+
+    setApplyingIndex(messageIndex);
+    try {
+      await onApplyModification(message.modification.operations);
+      setMessages((prev) =>
+        prev.map((m, i) => i === messageIndex ? { ...m, modificationApplied: true } : m)
+      );
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: `Failed to apply changes: ${(err as Error).message}` },
+      ]);
+    } finally {
+      setApplyingIndex(null);
+    }
+  }, [messages, onApplyModification]);
+
+  // Handle dismissing a modification
+  const handleDismiss = useCallback((messageIndex: number) => {
+    setMessages((prev) =>
+      prev.map((m, i) => i === messageIndex ? { ...m, modificationApplied: false } : m)
+    );
+  }, []);
+
+  // Ask about this specific project (uses Claude with project context + tools)
   const handleAskProject = useCallback(async (question?: string) => {
     const q = question || input.trim();
     if (!q || isLoading || disabled) return;
@@ -46,8 +192,25 @@ export function AskTheField({ isOpen, onToggle, onAskProject, onAskGeneral, disa
     setIsLoading(true);
 
     try {
-      const answer = await onAskProject(q);
-      setMessages((prev) => [...prev, { role: 'assistant', content: answer }]);
+      const response = await onAskProject(q);
+
+      if (response.type === 'text') {
+        setMessages((prev) => [...prev, { role: 'assistant', content: response.answer }]);
+      } else {
+        // Modification response — show confirmation card
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: response.answer,
+            modification: {
+              reasoning: response.reasoning,
+              operations: response.operations,
+              warnings: response.warnings,
+            },
+          },
+        ]);
+      }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -135,7 +298,7 @@ export function AskTheField({ isOpen, onToggle, onAskProject, onAskGeneral, disa
         {messages.length === 0 ? (
           <div className="text-center">
             <p className="text-sm text-fv-gray-400 mb-4">
-              I can explain your schedule, suggest improvements, and answer questions. I won&apos;t make changes directly - you&apos;re in control.
+              Ask questions about your schedule, or tell me to add, update, or remove tasks. I&apos;ll show you the changes before applying them.
             </p>
             <div className="flex flex-wrap gap-2 justify-center">
               {PROMPT_CHIPS.map((chip) => (
@@ -152,21 +315,35 @@ export function AskTheField({ isOpen, onToggle, onAskProject, onAskGeneral, disa
           </div>
         ) : (
           messages.map((message, i) => (
-            <div
-              key={i}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+            <div key={i}>
               <div
-                className={`
-                  max-w-[85%] px-3 py-2 rounded-lg text-sm
-                  ${message.role === 'user'
-                    ? 'bg-fv-blue text-white'
-                    : 'bg-fv-gray-800 text-fv-gray-200'
-                  }
-                `}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                {message.content}
+                <div
+                  className={`
+                    max-w-[85%] px-3 py-2 rounded-lg text-sm
+                    ${message.role === 'user'
+                      ? 'bg-fv-blue text-white'
+                      : 'bg-fv-gray-800 text-fv-gray-200'
+                    }
+                  `}
+                >
+                  {message.content}
+                </div>
               </div>
+
+              {/* Modification confirmation card */}
+              {message.modification && (
+                <div className="mt-2">
+                  <ModificationCard
+                    modification={message.modification}
+                    applied={message.modificationApplied}
+                    applying={applyingIndex === i}
+                    onApply={() => handleApply(i)}
+                    onDismiss={() => handleDismiss(i)}
+                  />
+                </div>
+              )}
             </div>
           ))
         )}
@@ -206,7 +383,7 @@ export function AskTheField({ isOpen, onToggle, onAskProject, onAskGeneral, disa
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a question..."
+            placeholder="Ask or modify the schedule..."
             disabled={isLoading || disabled}
             className="w-full bg-fv-gray-800 border border-fv-gray-700 rounded px-3 py-2 text-sm text-white placeholder:text-fv-gray-500 focus:border-fv-blue focus:outline-none disabled:opacity-50"
           />

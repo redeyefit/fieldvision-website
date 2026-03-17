@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient as createBrowserAuthClient } from '@supabase/ssr';
 
 // Client-side Supabase client (uses anon key, respects RLS)
 export function createBrowserClient() {
@@ -10,6 +11,18 @@ export function createBrowserClient() {
   }
 
   return createClient(supabaseUrl, supabaseAnonKey);
+}
+
+// Client-side Supabase auth client (uses anon key + cookies)
+export function createAuthClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  return createBrowserAuthClient(supabaseUrl, supabaseAnonKey);
 }
 
 // Server-side Supabase client with service role (bypasses RLS)

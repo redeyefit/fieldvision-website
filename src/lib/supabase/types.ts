@@ -61,6 +61,40 @@ export interface GenerateScheduleResponse {
   tasks: Task[];
 }
 
+// AI schedule modification types
+export interface ScheduleModificationOperation {
+  action: 'add' | 'update' | 'delete';
+  task_name: string;
+  name?: string;
+  trade?: string;
+  duration_days?: number;
+  depends_on_names?: string[];
+  insert_after?: string;
+}
+
+export interface FieldChange {
+  from: string | number | string[] | null;
+  to: string | number | string[] | null;
+}
+
+export interface ValidatedOperation {
+  action: 'add' | 'update' | 'delete';
+  task_id?: string;        // Resolved UUID (undefined for 'add')
+  task_name: string;       // Display name
+  changes: Record<string, FieldChange>;
+  warnings?: string[];
+}
+
+export type AskResponse =
+  | { type: 'text'; answer: string }
+  | {
+      type: 'modification';
+      answer: string;
+      reasoning: string;
+      operations: ValidatedOperation[];
+      warnings: string[];
+    };
+
 // Client-side state types
 export interface ScheduleState {
   project: Project | null;

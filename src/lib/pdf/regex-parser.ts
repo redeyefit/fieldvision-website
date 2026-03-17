@@ -81,8 +81,9 @@ export function tryRegexExtract(rawText: string): ParsedTask[] | null {
     // Skip non-task rows
     if (/^title$/i.test(rawName) || /^start$/i.test(rawName) || /^workdays$/i.test(rawName)) continue;
 
-    // Parse start date — collapse split digits like "1 1" -> "11"
-    const cleanDate = dateStr.replace(/(\d)\s+(\d)/g, '$1$2');
+    // Parse start date — collapse split digits like "1 1" -> "11" but NOT day-year gaps like "30 2025"
+    // Negative lookahead: only collapse when the second digit is NOT followed by 2+ more digits (a year)
+    const cleanDate = dateStr.replace(/(\d)\s+(\d)(?!\d{2})/g, '$1$2');
     const dateParts = cleanDate.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})\s+(\d{4})/i);
     if (!dateParts) continue;
     const monthNum = MONTHS[dateParts[1].substring(0, 3)];

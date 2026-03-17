@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
+import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
 import { generateSchedule } from '@/lib/ai/anthropic';
 import { recalculateTasks } from '@/lib/schedule/workdays';
 import { v4 as uuidv4 } from 'uuid';
@@ -35,8 +36,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    // TODO: Add Clerk auth when ready for user accounts
-    const userId = null; // Disabled for MVP
+    const userId = await getAuthUserId();
     const anonymousId = request.headers.get('x-anonymous-id');
 
     if (!userId && !anonymousId) {
@@ -44,6 +44,7 @@ export async function POST(
     }
 
     const supabase = createServerClient();
+    await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
     const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
