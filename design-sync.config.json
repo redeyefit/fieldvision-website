@@ -1,0 +1,30 @@
+{
+  "pkg": "fieldvision-web",
+  "globalName": "FieldVision",
+  "projectId": "aecce1fa-8bbf-4c16-8f85-9eb74c29956b",
+  "shape": "package",
+  "entry": "./.ds-entry.tsx",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/.cache/compiled.css",
+  "componentSrcMap": {
+    "PDFUploader": "src/components/schedule/PDFUploader.tsx",
+    "LineItemsTable": "src/components/schedule/LineItemsTable.tsx",
+    "GanttBars": "src/components/schedule/GanttBars.tsx",
+    "ScheduleTable": "src/components/schedule/ScheduleTable.tsx",
+    "AskTheField": "src/components/schedule/AskTheField.tsx"
+  },
+  "dtsPropsFor": {
+    "PDFUploader": "  /** Called with the dropped PDF and any client-extracted text. */\n  onUpload: (file: File, text: string) => Promise<void>;\n  disabled?: boolean;\n  /** URL of an already-uploaded PDF; shows a \"PDF uploaded · View\" row. */\n  pdfUrl?: string | null;",
+    "LineItemsTable": "  /** Extracted contract line items. */\n  items: Array<{ id: string; project_id: string; text: string; trade: string | null; quantity: number | null; unit: string | null; notes: string | null; confirmed: boolean }>;\n  onUpdate: (items: Array<{ id: string; project_id: string; text: string; trade: string | null; quantity: number | null; unit: string | null; notes: string | null; confirmed: boolean }>) => Promise<void>;\n  onConfirmAll: () => Promise<void>;\n  disabled?: boolean;",
+    "GanttBars": "  /** Scheduled tasks rendered as a dependency-aware Gantt chart. */\n  tasks: Array<{ id: string; project_id: string; name: string; trade: string | null; duration_days: number; start_date: string; end_date: string; depends_on: string[]; sequence_index: number }>;\n  selectedTaskId: string | null;\n  onSelectTask: (taskId: string | null) => void;\n  disabled?: boolean;",
+    "ScheduleTable": "  /** Tasks shown in the editable, drag-reorderable table. */\n  tasks: Array<{ id: string; project_id: string; name: string; trade: string | null; duration_days: number; start_date: string; end_date: string; depends_on: string[]; sequence_index: number }>;\n  /** All tasks (for the dependency picker). */\n  allTasks: Array<{ id: string; project_id: string; name: string; trade: string | null; duration_days: number; start_date: string; end_date: string; depends_on: string[]; sequence_index: number }>;\n  onReorder: (sourceIndex: number, destIndex: number) => void;\n  onUpdateTask: (taskId: string, updates: Partial<{ id: string; project_id: string; name: string; trade: string | null; duration_days: number; start_date: string; end_date: string; depends_on: string[]; sequence_index: number }>) => void;\n  onAddTask: (afterIndex?: number) => void;\n  onDeleteTask: (taskId: string) => void;\n  selectedTaskId: string | null;\n  onSelectTask: (taskId: string | null) => void;\n  disabled?: boolean;",
+    "AskTheField": "  /** Whether the slide-out assistant panel is open. */\n  isOpen: boolean;\n  onToggle: () => void;\n  /** Ask about this project; may return a schedule-modification proposal. */\n  onAskProject: (question: string) => Promise<{ type: 'text'; answer: string } | { type: 'modification'; answer: string; reasoning: string; operations: Array<{ action: 'add' | 'update' | 'delete'; task_id?: string; task_name: string; changes: Record<string, { from: string | number | string[] | null; to: string | number | string[] | null }>; warnings?: string[] }>; warnings: string[] }>;\n  /** Ask a general construction question. */\n  onAskGeneral: (question: string) => Promise<string>;\n  onApplyModification: (operations: Array<{ action: 'add' | 'update' | 'delete'; task_id?: string; task_name: string; changes: Record<string, { from: string | number | string[] | null; to: string | number | string[] | null }>; warnings?: string[] }>) => Promise<void>;\n  disabled?: boolean;"
+  },
+  "overrides": {
+    "AskTheField": {
+      "cardMode": "single",
+      "primaryStory": "Open",
+      "viewport": "360x540"
+    }
+  }
+}
