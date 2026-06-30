@@ -597,6 +597,40 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ═══ ROOM SCAN — ADD-ON ═══ */}
+      <section className="relative py-20 md:py-32 px-6 bg-fv-black">
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+        <div className="max-w-4xl mx-auto">
+          <div className="reveal relative bg-white/[0.02] border border-white/[0.06] rounded-2xl md:rounded-3xl p-8 md:p-14 overflow-hidden">
+            <div className="absolute -top-24 -right-24 w-72 h-72 bg-fv-blue/[0.05] rounded-full blur-[110px]" />
+            <div className="relative flex flex-col md:flex-row md:items-center gap-8 md:gap-12">
+              {/* Icon */}
+              <div className="md:flex-shrink-0">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-fv-blue/20 to-fv-blue/5 border border-fv-blue/20 flex items-center justify-center text-fv-blue">
+                  <ScanIcon />
+                </div>
+              </div>
+              {/* Copy */}
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="font-display text-[10px] font-semibold tracking-[0.3em] uppercase text-fv-blue">Add-on</span>
+                  <span className="font-display text-[10px] font-semibold tracking-[0.15em] uppercase text-gray-300 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.03]">$10 / mo</span>
+                </div>
+                <h2 className="font-display text-[clamp(1.75rem,4vw,3rem)] font-bold tracking-tight leading-[1.1] mb-4">
+                  Room Scan
+                </h2>
+                <p className="text-gray-400 text-base md:text-lg leading-relaxed max-w-xl mb-7">
+                  Walk a room, get a 3D model and instant square footage. An optional add-on for as-built measurements — without the tape measure.
+                </p>
+                <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2.5 font-display font-semibold text-sm md:text-base px-6 md:px-7 py-3 md:py-3.5 bg-white text-black rounded-2xl hover:shadow-[0_0_50px_rgba(255,255,255,0.12)] transition-all duration-500">
+                  <AppleIcon /> Get it on the App Store
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ═══ FINAL CTA ═══ */}
       <section className="relative py-24 md:py-52 px-6 text-center bg-fv-black overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(59,155,217,0.06)_0%,transparent_50%)]" />
@@ -652,6 +686,18 @@ export default function Home() {
 }
 
 // ─── Icons ───
+function ScanIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 8V5a2 2 0 0 1 2-2h3" />
+      <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+      <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+      <path d="M21 16v3a2 2 0 0 1-2 2h-3" />
+      <path d="M12 8.2l3.2 1.8v3.8L12 15.6l-3.2-1.8v-3.8z" />
+      <path d="M12 8.2v7.4M8.8 10l3.2 1.8L15.2 10" />
+    </svg>
+  );
+}
 function AppleIcon() {
   return <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" /></svg>;
 }
