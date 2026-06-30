@@ -404,7 +404,7 @@ export default function Home() {
           num: '04',
           category: 'Ask',
           promise: 'To put codes, budgets, and schedules in your pocket.',
-          desc: 'IRC egress requirements. HVAC budget. Inspection dates. One AI that knows building codes AND your entire project history.',
+          desc: 'Egress codes. HVAC budgets. Inspection dates. Ask anything — AI that answers construction and code questions and knows your entire project history.',
           screenshot: '/screenshots/03_project_sections.png',
           bgImage: '/section-04.webp',
         },
