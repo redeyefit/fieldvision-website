@@ -230,6 +230,22 @@ export default function Home() {
     };
   }, [loaded]);
 
+  // Play only the in-view product-demo clip — keeps this scroll-heavy page smooth.
+  useEffect(() => {
+    if (!loaded) return;
+    const vids = Array.from(document.querySelectorAll<HTMLVideoElement>('.ps-video'));
+    if (!vids.length) return;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        const v = e.target as HTMLVideoElement;
+        if (e.isIntersecting) v.play().catch(() => {});
+        else v.pause();
+      });
+    }, { threshold: 0.4 });
+    vids.forEach((v) => io.observe(v));
+    return () => io.disconnect();
+  }, [loaded]);
+
   return (
     <div>
       {/* ═══ LOADING ═══ */}
@@ -361,6 +377,7 @@ export default function Home() {
           promise: 'To end the era of forgotten field notes.',
           desc: 'Photos, video, voice — tag rooms as you walk. One-handed, on the move. Everything you capture goes straight into your report.',
           screenshot: '/screenshots/01_home.png',
+          video: '/demos/capture',
           bgImage: '/section-01.webp',
         },
         {
@@ -370,6 +387,7 @@ export default function Home() {
           promise: 'To give you back your evenings.',
           desc: 'One tap. AI fuses photos, video, voice, and notes into a structured daily report. Weather and zones included. Done in 30 seconds.',
           screenshot: '/screenshots/02_project_detail.png',
+          video: '/demos/generate',
           bgImage: '/section-02.webp',
         },
         {
@@ -379,6 +397,7 @@ export default function Home() {
           promise: 'To make every report bulletproof.',
           desc: 'Review, edit, then PDF, email, or share. Professional documentation that protects you when disputes arise. Done before you leave the site.',
           screenshot: '/screenshots/04_daily_report.png',
+          video: '/demos/send',
           bgImage: '/section-03.webp',
         },
         {
@@ -388,6 +407,7 @@ export default function Home() {
           promise: 'To put codes, budgets, and schedules in your pocket.',
           desc: 'IRC egress requirements. HVAC budget. Inspection dates. One AI that knows building codes AND your entire project history.',
           screenshot: '/screenshots/03_project_sections.png',
+          video: '/demos/ask',
           bgImage: '/section-04.webp',
         },
       ].map((section, i) => (
@@ -427,14 +447,30 @@ export default function Home() {
               <div className="ps-phone md:flex-shrink-0">
                 <div className="bg-gradient-to-b from-[#2a2a2e] to-[#1a1a1e] rounded-[36px] md:rounded-[44px] p-[3px] md:p-[5px] shadow-[0_30px_80px_rgba(0,0,0,0.7)] border border-white/[0.06]">
                   <div className="bg-black rounded-[33px] md:rounded-[40px] p-[2px]">
-                    <Image
-                      src={section.screenshot}
-                      alt={section.category}
-                      width={300}
-                      height={640}
-                      priority={i === 0}
-                      className="rounded-[31px] md:rounded-[38px] w-44 md:w-56 lg:w-64 h-auto"
-                    />
+                    {section.video ? (
+                      <video
+                        muted
+                        loop
+                        playsInline
+                        preload="none"
+                        poster={section.screenshot}
+                        width={300}
+                        height={640}
+                        className="ps-video rounded-[31px] md:rounded-[38px] w-44 md:w-56 lg:w-64 h-auto block"
+                      >
+                        <source src={`${section.video}.webm`} type="video/webm" />
+                        <source src={`${section.video}.mp4`} type="video/mp4" />
+                      </video>
+                    ) : (
+                      <Image
+                        src={section.screenshot}
+                        alt={section.category}
+                        width={300}
+                        height={640}
+                        priority={i === 0}
+                        className="rounded-[31px] md:rounded-[38px] w-44 md:w-56 lg:w-64 h-auto"
+                      />
+                    )}
                   </div>
                 </div>
               </div>
