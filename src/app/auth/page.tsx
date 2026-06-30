@@ -2,14 +2,19 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { createAuthClient } from '@/lib/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Mode = 'signin' | 'create';
 type View = 'auth' | 'forgot';
 
+// Touch-friendly input sizing for mobile
+const inputClass =
+  'w-full rounded-lg bg-black/40 border border-white/10 px-4 py-3 text-base text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-fv-blue transition-colors';
+
 function AuthForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, isLoading: authLoading, signIn, signUp, resetPassword } = useAuth();
   const [mode, setMode] = useState<Mode>('signin');
   const [view, setView] = useState<View>('auth');
   const [email, setEmail] = useState('');
@@ -28,21 +33,12 @@ function AuthForm() {
     }
   }, [searchParams]);
 
-  // Redirect if already logged in
+  // Redirect if already logged in (via context)
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const supabase = createAuthClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          router.replace('/schedule');
-        }
-      } catch {
-        // Not authenticated
-      }
-    };
-    checkAuth();
-  }, [router]);
+    if (!authLoading && user) {
+      router.replace('/schedule');
+    }
+  }, [authLoading, user, router]);
 
   const handleSignIn = async () => {
     if (!email || !password) {
@@ -53,14 +49,12 @@ function AuthForm() {
 
     setStatus('loading');
     setMessage(null);
-    try {
-      const supabase = createAuthClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      router.replace('/schedule');
-    } catch (err) {
+    const { error } = await signIn(email, password);
+    if (error) {
       setStatus('error');
-      setMessage((err as Error).message || 'Sign in failed.');
+      setMessage(error.message || 'Sign in failed.');
+    } else {
+      router.replace('/schedule');
     }
   };
 
@@ -83,22 +77,16 @@ function AuthForm() {
 
     setStatus('loading');
     setMessage(null);
-    try {
-      const supabase = createAuthClient();
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: fullName.trim() } },
-      });
-      if (error) throw error;
+    const { error } = await signUp(email, password, fullName);
+    if (error) {
+      setStatus('error');
+      setMessage(error.message || 'Failed to create account.');
+    } else {
       setStatus('success');
       setMessage('Account created! Check your email to confirm, then sign in.');
       setMode('signin');
       setPassword('');
       setConfirmPassword('');
-    } catch (err) {
-      setStatus('error');
-      setMessage((err as Error).message || 'Failed to create account.');
     }
   };
 
@@ -111,17 +99,13 @@ function AuthForm() {
 
     setStatus('loading');
     setMessage(null);
-    try {
-      const supabase = createAuthClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      });
-      if (error) throw error;
+    const { error } = await resetPassword(email);
+    if (error) {
+      setStatus('error');
+      setMessage(error.message || 'Failed to send reset link.');
+    } else {
       setStatus('success');
       setMessage('Reset link sent! Check your email.');
-    } catch (err) {
-      setStatus('error');
-      setMessage((err as Error).message || 'Failed to send reset link.');
     }
   };
 
@@ -136,9 +120,26 @@ function AuthForm() {
     }
   };
 
+  const handleContinueAnonymous = () => {
+    router.push('/schedule');
+  };
+
+  // Show spinner while checking auth
+  if (authLoading) {
+    return (
+      <div className="flex items-center gap-3">
+        <svg className="animate-spin w-6 h-6 text-fv-blue" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <span className="text-white/50">Loading...</span>
+      </div>
+    );
+  }
+
   if (view === 'forgot') {
     return (
-      <div className="w-full max-w-md space-y-6 rounded-2xl border border-white/10 bg-white/5 p-8 shadow-xl">
+      <div className="w-full max-w-md space-y-6 rounded-2xl border border-white/10 bg-white/5 p-6 sm:p-8 shadow-xl backdrop-blur-sm">
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold">Reset Password</h1>
           <p className="text-sm text-white/70">
@@ -146,19 +147,23 @@ function AuthForm() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <label className="text-sm text-white/80" htmlFor="reset-email">Email</label>
-          <input
-            id="reset-email"
-            type="email"
-            className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-fv-blue"
-            placeholder="you@company.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm text-white/80" htmlFor="reset-email">Email</label>
+            <input
+              id="reset-email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              className={inputClass}
+              placeholder="you@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
           <button
             type="submit"
-            className="w-full rounded-lg bg-fv-blue px-4 py-2 font-medium text-black hover:bg-fv-blue/90 disabled:opacity-60"
+            className="w-full rounded-lg bg-fv-blue px-4 py-3 text-base font-medium text-black hover:bg-fv-blue/90 active:scale-[0.98] disabled:opacity-60 transition-all"
             disabled={status === 'loading'}
           >
             {status === 'loading' ? 'Sending...' : 'Send Reset Link'}
@@ -168,7 +173,7 @@ function AuthForm() {
         <button
           type="button"
           onClick={() => { setView('auth'); setMessage(null); setStatus('idle'); }}
-          className="text-sm text-fv-blue hover:text-fv-blue/80"
+          className="text-sm text-fv-blue hover:text-fv-blue/80 active:text-fv-blue/60"
         >
           Back to sign in
         </button>
@@ -183,7 +188,8 @@ function AuthForm() {
   }
 
   return (
-    <div className="w-full max-w-md space-y-6 rounded-2xl border border-white/10 bg-white/5 p-8 shadow-xl">
+    <div className="w-full max-w-md space-y-6 rounded-2xl border border-white/10 bg-white/5 p-6 sm:p-8 shadow-xl backdrop-blur-sm">
+      {/* Logo / Branding */}
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold">
           {mode === 'create' ? 'Create your account' : 'Sign in to FieldVision'}
@@ -200,7 +206,7 @@ function AuthForm() {
         <button
           type="button"
           onClick={() => { setMode('signin'); setMessage(null); setStatus('idle'); }}
-          className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
             mode === 'signin'
               ? 'bg-white/10 text-white'
               : 'text-white/50 hover:text-white/70'
@@ -211,7 +217,7 @@ function AuthForm() {
         <button
           type="button"
           onClick={() => { setMode('create'); setMessage(null); setStatus('idle'); }}
-          className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
             mode === 'create'
               ? 'bg-white/10 text-white'
               : 'text-white/50 hover:text-white/70'
@@ -221,59 +227,68 @@ function AuthForm() {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* Name field (create account only) */}
         {mode === 'create' && (
-          <>
+          <div className="space-y-1.5">
             <label className="text-sm text-white/80" htmlFor="fullName">Full Name</label>
             <input
               id="fullName"
               type="text"
-              className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-fv-blue"
+              autoComplete="name"
+              className={inputClass}
               placeholder="Your name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
-          </>
+          </div>
         )}
 
-        <label className="text-sm text-white/80" htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-fv-blue"
-          placeholder="you@company.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <div className="space-y-1.5">
+          <label className="text-sm text-white/80" htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            className={inputClass}
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
 
-        <label className="text-sm text-white/80" htmlFor="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-fv-blue"
-          placeholder={mode === 'create' ? 'At least 6 characters' : 'Your password'}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <div className="space-y-1.5">
+          <label className="text-sm text-white/80" htmlFor="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            autoComplete={mode === 'create' ? 'new-password' : 'current-password'}
+            className={inputClass}
+            placeholder={mode === 'create' ? 'At least 6 characters' : 'Your password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
 
         {mode === 'create' && (
-          <>
+          <div className="space-y-1.5">
             <label className="text-sm text-white/80" htmlFor="confirmPassword">Confirm Password</label>
             <input
               id="confirmPassword"
               type="password"
-              className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-fv-blue"
+              autoComplete="new-password"
+              className={inputClass}
               placeholder="Confirm your password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
-          </>
+          </div>
         )}
 
         <button
           type="submit"
-          className="w-full rounded-lg bg-fv-blue px-4 py-2 font-medium text-black hover:bg-fv-blue/90 disabled:opacity-60"
+          className="w-full rounded-lg bg-fv-blue px-4 py-3 text-base font-medium text-black hover:bg-fv-blue/90 active:scale-[0.98] disabled:opacity-60 transition-all"
           disabled={status === 'loading'}
         >
           {status === 'loading'
@@ -288,7 +303,7 @@ function AuthForm() {
         <button
           type="button"
           onClick={() => { setView('forgot'); setMessage(null); setStatus('idle'); }}
-          className="text-sm text-fv-blue hover:text-fv-blue/80"
+          className="text-sm text-fv-blue hover:text-fv-blue/80 active:text-fv-blue/60"
         >
           Forgot password?
         </button>
@@ -299,13 +314,31 @@ function AuthForm() {
           {message}
         </p>
       )}
+
+      {/* Anonymous access divider */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-white/10" />
+        </div>
+        <div className="relative flex justify-center text-xs">
+          <span className="bg-fv-black px-3 text-white/40">or</span>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleContinueAnonymous}
+        className="w-full rounded-lg border border-white/10 px-4 py-3 text-sm text-white/70 hover:bg-white/5 active:scale-[0.98] transition-all"
+      >
+        Continue without an account
+      </button>
     </div>
   );
 }
 
 export default function AuthPage() {
   return (
-    <div className="min-h-screen bg-fv-black text-white flex items-center justify-center px-6">
+    <div className="min-h-[100dvh] bg-fv-black text-white flex items-center justify-center px-4 py-8 safe-area-inset">
       <Suspense fallback={<div className="text-white/50">Loading...</div>}>
         <AuthForm />
       </Suspense>

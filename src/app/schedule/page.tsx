@@ -10,13 +10,17 @@ import { GanttBars } from '@/components/schedule/GanttBars';
 import { AskTheField } from '@/components/schedule/AskTheField';
 import { Task, AskResponse, ValidatedOperation, Project } from '@/lib/supabase/types';
 import { createAuthClient } from '@/lib/supabase/client';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Wrapper to handle Suspense for useSearchParams
 export default function SchedulePage() {
   return (
-    <Suspense fallback={<ScheduleLoadingFallback />}>
-      <SchedulePageContent />
-    </Suspense>
+    <ProtectedRoute>
+      <Suspense fallback={<ScheduleLoadingFallback />}>
+        <SchedulePageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }
 
@@ -37,10 +41,14 @@ function ScheduleLoadingFallback() {
 function SchedulePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
   const projectIdFromUrl = searchParams.get('id');
   const [routeDecision, setRouteDecision] = useState<'loading' | 'editor' | 'dashboard'>('loading');
 
   useEffect(() => {
+    // Wait for auth context to resolve
+    if (authLoading) return;
+
     // If there's a project ID, always show editor — no check needed
     if (projectIdFromUrl) {
       setRouteDecision('editor');
@@ -49,16 +57,10 @@ function SchedulePageContent() {
 
     // No ?id — figure out where to send the user
     const decide = async () => {
-      // 1. Check if logged in → dashboard
-      try {
-        const supabase = createAuthClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          setRouteDecision('dashboard');
-          return;
-        }
-      } catch {
-        // Not authenticated, continue
+      // 1. Check if logged in → dashboard (via context, no extra Supabase call)
+      if (user) {
+        setRouteDecision('dashboard');
+        return;
       }
 
       // 2. Check if anonymous user has existing projects → auto-redirect to most recent
@@ -89,7 +91,7 @@ function SchedulePageContent() {
     };
 
     decide();
-  }, [projectIdFromUrl, router]);
+  }, [projectIdFromUrl, router, user, authLoading]);
 
   if (routeDecision === 'loading') {
     return <ScheduleLoadingFallback />;
@@ -112,28 +114,13 @@ interface DashboardProject extends Project {
 
 function ScheduleDashboard() {
   const router = useRouter();
+  const { user: authUser } = useAuth();
   const [projects, setProjects] = useState<DashboardProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const userEmail = authUser?.email ?? null;
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  // Check auth state
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const supabase = createAuthClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user?.email) {
-          setUserEmail(user.email);
-        }
-      } catch {
-        // Not authenticated, that's fine
-      }
-    };
-    checkAuth();
-  }, []);
 
   // Fetch projects
   useEffect(() => {
@@ -246,13 +233,11 @@ function ScheduleDashboard() {
     }
   };
 
-  // Sign out
+  // Sign out (via context)
+  const { signOut } = useAuth();
   const handleSignOut = async () => {
     try {
-      const supabase = createAuthClient();
-      await supabase.auth.signOut();
-      setUserEmail(null);
-      // Refresh project list (will now use anonymous ID only)
+      await signOut();
       window.location.reload();
     } catch {
       // ignore
@@ -276,34 +261,43 @@ function ScheduleDashboard() {
 
   return (
     <div className="min-h-screen bg-fv-black text-white">
-      {/* Header */}
-      <header className="h-14 border-b border-white/10 px-6 flex items-center justify-between bg-fv-gray-900/50 backdrop-blur-sm">
-        <a href="/" className="flex items-center gap-2">
-          <img src="/logo_backup.png" alt="FieldVision" className="h-8 w-8" />
-          <span className="font-display font-semibold text-lg">Schedule Maker</span>
-        </a>
-
-        <div className="flex items-center gap-3">
-          {userEmail ? (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-white/60">{userEmail}</span>
-              <button
-                onClick={handleSignOut}
-                className="text-sm text-white/40 hover:text-white/70 transition-colors"
-              >
-                Sign out
-              </button>
+      {/* Nav — matches homepage floating glass bar */}
+      <nav className="fixed top-0 left-0 right-0 z-[100] px-3 md:px-10 py-3 md:py-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center bg-black/60 backdrop-blur-2xl border border-white/[0.06] rounded-xl md:rounded-2xl px-4 md:px-5 py-2.5 md:py-3">
+          <a href="/" className="flex items-center gap-2 font-display font-semibold text-sm tracking-tight">
+            <div className="bg-white rounded-lg md:rounded-xl p-1 md:p-1.5">
+              <img src="/logo_backup.png" alt="FieldVision" className="w-4 h-4 md:w-5 md:h-5" />
             </div>
-          ) : (
-            <a
-              href="/auth"
-              className="text-sm text-fv-blue hover:text-fv-blue/80 transition-colors"
-            >
-              Sign in to sync across devices
+            <span className="hidden sm:inline">FieldVision</span>
+          </a>
+          <div className="flex items-center gap-4 md:gap-8">
+            <a href="/" className="font-display text-[11px] font-medium tracking-[0.15em] uppercase transition-colors duration-300 text-gray-500 hover:text-gray-300">
+              Home
             </a>
-          )}
+            <a href="/schedule" className="font-display text-[11px] font-medium tracking-[0.15em] uppercase transition-colors duration-300 text-white">
+              Schedule
+            </a>
+            <a href="/pricing" className="font-display text-[11px] font-medium tracking-[0.15em] uppercase transition-colors duration-300 text-gray-500 hover:text-gray-300">
+              Pricing
+            </a>
+          </div>
+          <div className="flex items-center gap-3">
+            {userEmail ? (
+              <div className="flex items-center gap-3">
+                <span className="font-display text-[11px] text-gray-500">{userEmail}</span>
+                <button onClick={handleSignOut} className="font-display text-[11px] text-gray-500 hover:text-gray-300 transition-colors">
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <a href="/auth" className="font-display text-[11px] md:text-xs font-semibold px-4 md:px-5 py-2 md:py-2.5 bg-white text-black rounded-lg md:rounded-xl hover:bg-gray-100 transition-all duration-300">
+                Sign In
+              </a>
+            )}
+          </div>
         </div>
-      </header>
+      </nav>
+      <div className="h-16" /> {/* Spacer for fixed nav */}
 
       {/* Main */}
       <main className="max-w-4xl mx-auto px-6 py-12">
@@ -439,21 +433,8 @@ function ScheduleDashboard() {
 
 function ScheduleEditor({ projectIdFromUrl }: { projectIdFromUrl?: string }) {
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-
-  // Check auth state for header display
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const supabase = createAuthClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user?.email) setUserEmail(user.email);
-      } catch {
-        // Not authenticated
-      }
-    };
-    checkAuth();
-  }, []);
+  const { user: authUser } = useAuth();
+  const userEmail = authUser?.email ?? null;
 
   const {
     project,
@@ -1139,12 +1120,14 @@ function ScheduleEditor({ projectIdFromUrl }: { projectIdFromUrl?: string }) {
   return (
     <div className="h-screen bg-fv-black text-white flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="h-14 border-b border-fv-gray-800 px-6 flex items-center justify-between bg-fv-gray-900/50 backdrop-blur-sm">
+      <header className="h-14 border-b border-white/[0.06] px-6 flex items-center justify-between bg-black/60 backdrop-blur-2xl">
         <div className="flex items-center gap-4">
           {/* Logo + Back to dashboard */}
-          <a href="/schedule" className="flex items-center gap-2">
-            <img src="/logo_backup.png" alt="FieldVision" className="h-8 w-8" />
-            <span className="font-display font-semibold text-lg">Schedule Maker</span>
+          <a href="/schedule" className="flex items-center gap-2 font-display font-semibold text-sm tracking-tight">
+            <div className="bg-white rounded-lg p-1">
+              <img src="/logo_backup.png" alt="FieldVision" className="w-4 h-4" />
+            </div>
+            <span className="hidden sm:inline">Schedule</span>
           </a>
 
           {/* Project Name */}

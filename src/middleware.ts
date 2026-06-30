@@ -76,21 +76,18 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Auth endpoints must never be cached by service worker (Network Only)
+  if (request.nextUrl.pathname.startsWith('/auth/callback')) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  }
+
   // Protected routes — redirect to /auth if not authenticated
-  const isProtectedRoute = request.nextUrl.pathname === '/schedule';
+  const protectedPaths = ['/schedule', '/dashboard'];
+  const isProtectedRoute = protectedPaths.some(p => request.nextUrl.pathname.startsWith(p));
   if (isProtectedRoute && !user) {
-    // Allow if user has anonymous ID cookie/header (anonymous schedule access)
-    const hasAnonymousId = request.headers.get('x-anonymous-id')
-      || request.cookies.get('fieldvision_anonymous_id');
-    if (!hasAnonymousId) {
-      // Don't redirect if it has a project ID (direct link access)
-      const hasProjectId = request.nextUrl.searchParams.has('id');
-      if (!hasProjectId) {
-        const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = '/auth';
-        return NextResponse.redirect(redirectUrl);
-      }
-    }
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = '/auth';
+    return NextResponse.redirect(redirectUrl);
   }
 
   // Redirect authenticated users away from /auth

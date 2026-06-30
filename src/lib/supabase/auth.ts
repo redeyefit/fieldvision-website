@@ -20,8 +20,8 @@ function getSupabaseAnonKey() {
   return supabaseAnonKey;
 }
 
-export function createServerAuthClient() {
-  const cookieStore = cookies();
+export async function createServerAuthClient() {
+  const cookieStore = await cookies();
   return createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
     cookies: {
       get(name) {
@@ -38,7 +38,7 @@ export function createServerAuthClient() {
 }
 
 export async function getAuthUserId(): Promise<string | null> {
-  const supabase = createServerAuthClient();
+  const supabase = await createServerAuthClient();
   const { data, error } = await supabase.auth.getUser();
   if (error) return null;
   return data.user?.id ?? null;

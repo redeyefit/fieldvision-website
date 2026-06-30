@@ -1,3 +1,5 @@
+const withSerwist = require("@serwist/next").default;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Output static files for existing pages during transition
@@ -6,9 +8,7 @@ const nextConfig = {
   // pdfjs-dist must NOT be bundled by webpack — its Node.js legacy build
   // needs to run as a real Node.js require in serverless functions
   // (Next.js 14 requires this under 'experimental')
-  experimental: {
-    serverComponentsExternalPackages: ['pdfjs-dist'],
-  },
+  serverExternalPackages: ['pdfjs-dist'],
 
   // Optimize images
   images: {
@@ -32,4 +32,8 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withSerwist({
+  swSrc: "src/sw.ts",
+  swDest: "public/sw.js",
+  disable: process.env.NODE_ENV === "development",
+})(nextConfig);

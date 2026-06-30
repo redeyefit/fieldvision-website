@@ -7,20 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 const APP_STORE_URL =
   'https://apps.apple.com/us/app/fieldvision-ai-construction/id6756640990';
 
-// ─── Cursor glow ───
-function useCursorGlow() {
-  useEffect(() => {
-    const glow = document.createElement('div');
-    glow.className = 'cursor-glow';
-    document.body.appendChild(glow);
-    const move = (e: MouseEvent) => {
-      glow.style.left = e.clientX + 'px';
-      glow.style.top = e.clientY + 'px';
-    };
-    window.addEventListener('mousemove', move);
-    return () => { window.removeEventListener('mousemove', move); glow.remove(); };
-  }, []);
-}
+// Cursor glow moved to layout via CursorGlow component
 
 // ─── Counter ───
 function Counter({ target, suffix = '', prefix = '' }: { target: string; suffix?: string; prefix?: string }) {
@@ -63,8 +50,6 @@ export default function Home() {
   const [loaded, setLoaded] = useState(false);
   const [navVisible, setNavVisible] = useState(false);
   const [activeSection, setActiveSection] = useState(0);
-
-  useCursorGlow();
 
   // Loading screen — dismiss when the page is actually ready.
   // Floor avoids a jarring flash; cap guarantees we never make people wait.
@@ -245,6 +230,22 @@ export default function Home() {
     };
   }, [loaded]);
 
+  // Play only the in-view product-demo clip — keeps this scroll-heavy page smooth.
+  useEffect(() => {
+    if (!loaded) return;
+    const vids = Array.from(document.querySelectorAll<HTMLVideoElement>('.ps-video'));
+    if (!vids.length) return;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        const v = e.target as HTMLVideoElement;
+        if (e.isIntersecting) v.play().catch(() => {});
+        else v.pause();
+      });
+    }, { threshold: 0.4 });
+    vids.forEach((v) => io.observe(v));
+    return () => io.disconnect();
+  }, [loaded]);
+
   return (
     <div>
       {/* ═══ LOADING ═══ */}
@@ -269,12 +270,22 @@ export default function Home() {
             </div>
             <span className="hidden sm:inline">FieldVision</span>
           </Link>
-          <div className="hidden md:flex items-center gap-8">
+          <div className="flex items-center gap-4 md:gap-8">
             {['Capture', 'Generate', 'Send', 'Ask'].map((item, i) => (
-              <a key={item} href={`#section-${i + 1}`} className={`font-display text-[11px] font-medium tracking-[0.15em] uppercase transition-colors duration-300 ${activeSection === i + 1 ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+              <button key={item} onClick={() => {
+                const el = document.getElementById(`section-${i + 1}`);
+                if (!el) return;
+                const lenis = (window as unknown as Record<string, unknown>).__lenis as { scrollTo: (target: number, options?: Record<string, unknown>) => void } | undefined;
+                const y = el.getBoundingClientRect().top + window.scrollY + 2;
+                if (lenis) { lenis.scrollTo(y, { duration: 1.2 }); }
+                else { window.scrollTo({ top: y, behavior: 'smooth' }); }
+              }} className={`font-display text-[11px] font-medium tracking-[0.15em] uppercase transition-colors duration-300 ${activeSection === i + 1 ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}>
                 {item}
-              </a>
+              </button>
             ))}
+            <Link href="/pricing" className="font-display text-[11px] font-medium tracking-[0.15em] uppercase transition-colors duration-300 text-gray-500 hover:text-gray-300">
+              Pricing
+            </Link>
           </div>
           <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="font-display text-[11px] md:text-xs font-semibold px-4 md:px-5 py-2 md:py-2.5 bg-white text-black rounded-lg md:rounded-xl hover:bg-gray-100 transition-all duration-300">
             Download
@@ -321,9 +332,16 @@ export default function Home() {
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="font-display font-semibold text-sm md:text-base px-6 md:px-8 py-3.5 md:py-4 bg-white text-black rounded-2xl hover:shadow-[0_0_60px_rgba(255,255,255,0.15)] transition-all duration-500 flex items-center justify-center gap-2.5">
               <AppleIcon /> Download Free
             </a>
-            <a href="#section-1" className="font-display font-medium text-sm md:text-base px-6 md:px-8 py-3.5 md:py-4 text-white border border-white/20 rounded-2xl hover:bg-white/10 transition-all duration-500 text-center">
+            <button onClick={() => {
+                const el = document.getElementById('section-1');
+                if (!el) return;
+                const lenis = (window as unknown as Record<string, unknown>).__lenis as { scrollTo: (target: number, options?: Record<string, unknown>) => void } | undefined;
+                const y = el.getBoundingClientRect().top + window.scrollY + 2;
+                if (lenis) { lenis.scrollTo(y, { duration: 1.2 }); }
+                else { window.scrollTo({ top: y, behavior: 'smooth' }); }
+              }} className="font-display font-medium text-sm md:text-base px-6 md:px-8 py-3.5 md:py-4 text-white border border-white/20 rounded-2xl hover:bg-white/10 transition-all duration-500 text-center">
               Explore
-            </a>
+            </button>
           </div>
         </div>
 
@@ -368,6 +386,7 @@ export default function Home() {
           promise: 'To give you back your evenings.',
           desc: 'One tap. AI fuses photos, video, voice, and notes into a structured daily report. Weather and zones included. Done in 30 seconds.',
           screenshot: '/screenshots/02_project_detail.png',
+          video: '/demos/generate',
           bgImage: '/section-02.webp',
         },
         {
@@ -377,6 +396,7 @@ export default function Home() {
           promise: 'To make every report bulletproof.',
           desc: 'Review, edit, then PDF, email, or share. Professional documentation that protects you when disputes arise. Done before you leave the site.',
           screenshot: '/screenshots/04_daily_report.png',
+          video: '/demos/send',
           bgImage: '/section-03.webp',
         },
         {
@@ -425,14 +445,30 @@ export default function Home() {
               <div className="ps-phone md:flex-shrink-0">
                 <div className="bg-gradient-to-b from-[#2a2a2e] to-[#1a1a1e] rounded-[36px] md:rounded-[44px] p-[3px] md:p-[5px] shadow-[0_30px_80px_rgba(0,0,0,0.7)] border border-white/[0.06]">
                   <div className="bg-black rounded-[33px] md:rounded-[40px] p-[2px]">
-                    <Image
-                      src={section.screenshot}
-                      alt={section.category}
-                      width={300}
-                      height={640}
-                      priority={i === 0}
-                      className="rounded-[31px] md:rounded-[38px] w-44 md:w-56 lg:w-64 h-auto"
-                    />
+                    {section.video ? (
+                      <video
+                        muted
+                        loop
+                        playsInline
+                        preload="none"
+                        poster={section.screenshot}
+                        width={300}
+                        height={640}
+                        className="ps-video rounded-[31px] md:rounded-[38px] w-44 md:w-56 lg:w-64 h-auto block"
+                      >
+                        <source src={`${section.video}.webm`} type="video/webm" />
+                        <source src={`${section.video}.mp4`} type="video/mp4" />
+                      </video>
+                    ) : (
+                      <Image
+                        src={section.screenshot}
+                        alt={section.category}
+                        width={300}
+                        height={640}
+                        priority={i === 0}
+                        className="rounded-[31px] md:rounded-[38px] w-44 md:w-56 lg:w-64 h-auto"
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -606,7 +642,7 @@ export default function Home() {
           <div className="flex gap-8 text-sm text-gray-600">
             <Link href="/privacy" className="hover:text-white transition-colors duration-300">Privacy</Link>
             <Link href="/terms" className="hover:text-white transition-colors duration-300">Terms</Link>
-            <a href="mailto:support@getfieldvision.ai" className="hover:text-white transition-colors duration-300">Support</a>
+            <a href="mailto:steven@fieldvision.ai" className="hover:text-white transition-colors duration-300">Support</a>
           </div>
           <p className="text-xs text-gray-700">© 2026 MyndAIX Inc.</p>
         </div>

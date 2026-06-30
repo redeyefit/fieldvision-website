@@ -85,25 +85,44 @@ export async function POST(request: NextRequest) {
     const supabase = createServerClient();
     await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
-    // Enforce free tier project limit
-    let countQuery = supabase.from('projects').select('id', { count: 'exact', head: true });
+    // Check subscription status — only enforce limit for free-tier / anonymous users
+    let enforceLimit = true;
     if (userId) {
-      countQuery = countQuery.eq('user_id', userId);
-    } else if (anonymousId) {
-      countQuery = countQuery.eq('anonymous_id', anonymousId);
-    }
-    const { count } = await countQuery;
+      const { data: subscription } = await supabase
+        .from('user_subscriptions')
+        .select('tier, status')
+        .eq('user_id', userId)
+        .single();
 
-    if (count !== null && count >= FREE_PROJECT_LIMIT) {
-      return NextResponse.json(
-        {
-          error: 'Project limit reached',
-          message: `Free accounts can create up to ${FREE_PROJECT_LIMIT} projects. Upgrade to Pro for unlimited projects.`,
-          limit: FREE_PROJECT_LIMIT,
-          current: count,
-        },
-        { status: 403, headers: corsHeaders() }
-      );
+      if (
+        subscription &&
+        subscription.tier !== 'free' &&
+        ['active', 'grace_period'].includes(subscription.status)
+      ) {
+        enforceLimit = false;
+      }
+    }
+
+    if (enforceLimit) {
+      let countQuery = supabase.from('projects').select('id', { count: 'exact', head: true });
+      if (userId) {
+        countQuery = countQuery.eq('user_id', userId);
+      } else if (anonymousId) {
+        countQuery = countQuery.eq('anonymous_id', anonymousId);
+      }
+      const { count } = await countQuery;
+
+      if (count !== null && count >= FREE_PROJECT_LIMIT) {
+        return NextResponse.json(
+          {
+            error: 'Project limit reached',
+            message: `Free accounts can create up to ${FREE_PROJECT_LIMIT} projects. Upgrade to Pro for unlimited projects.`,
+            limit: FREE_PROJECT_LIMIT,
+            current: count,
+          },
+          { status: 403, headers: corsHeaders() }
+        );
+      }
     }
 
     const projectData: Partial<Project> = {
