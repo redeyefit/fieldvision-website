@@ -51,13 +51,29 @@ export default function Home() {
   const [navVisible, setNavVisible] = useState(false);
   const [activeSection, setActiveSection] = useState(0);
 
-  // Loading screen
+  // Loading screen — dismiss when the page is actually ready.
+  // Floor avoids a jarring flash; cap guarantees we never make people wait.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-      setTimeout(() => setLoaded(true), 100);
-    }, 2400);
-    return () => clearTimeout(timer);
+    const MIN = 800;   // minimum brand moment (ms)
+    const MAX = 1800;  // hard cap — never wait longer than this (ms)
+    const start = performance.now();
+    let done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      const wait = Math.max(0, MIN - (performance.now() - start));
+      setTimeout(() => {
+        setLoading(false);
+        setTimeout(() => setLoaded(true), 100);
+      }, wait);
+    };
+
+    if (document.readyState === 'complete') finish();
+    else window.addEventListener('load', finish);
+    const cap = setTimeout(finish, MAX);
+
+    return () => { window.removeEventListener('load', finish); clearTimeout(cap); };
   }, []);
 
   // Nav on scroll
@@ -416,6 +432,7 @@ export default function Home() {
                       alt={section.category}
                       width={300}
                       height={640}
+                      priority={i === 0}
                       className="rounded-[31px] md:rounded-[38px] w-44 md:w-56 lg:w-64 h-auto"
                     />
                   </div>
@@ -539,7 +556,7 @@ export default function Home() {
               </div>
               <div>
                 <div className="font-display font-bold text-sm">Steven Fernandez</div>
-                <div className="text-gray-500 text-xs">Licensed GC &middot; $40M+ Custom Homes &middot; Founder</div>
+                <div className="text-gray-500 text-xs">Project Manager &middot; $40M+ Custom Homes &middot; Founder</div>
               </div>
             </div>
           </div>
@@ -573,7 +590,7 @@ export default function Home() {
             <div className="flex flex-wrap justify-center gap-10 text-gray-600 text-sm">
               <span className="flex items-center gap-2"><PhoneIcon /> iOS App</span>
               <span className="flex items-center gap-2"><ShieldIcon /> Data Stays Private</span>
-              <span className="flex items-center gap-2"><HomeSmallIcon /> Licensed GC Built</span>
+              <span className="flex items-center gap-2"><HomeSmallIcon /> Built by a PM</span>
             </div>
           </div>
         </div>
