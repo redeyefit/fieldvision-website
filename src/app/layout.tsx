@@ -4,13 +4,13 @@ import '@/styles/globals.css';
 export const metadata: Metadata = {
   title: 'FieldVision AI | Get Home 30 Minutes Earlier',
   description:
-    "Photos, video, or voice — FieldVision fuses it all into one professional daily report in 30 seconds. Built by a GC for superintendents.",
+    "Photos, video, or voice — FieldVision fuses it all into one professional daily report in 30 seconds. Built by a construction project manager for superintendents.",
   keywords:
     'construction daily report, AI daily report, superintendent software, field reporting, construction app, daily log',
   openGraph: {
     title: 'FieldVision AI | Get Home 30 Minutes Earlier',
     description:
-      'Photos, video, or voice — FieldVision fuses it all into one professional daily report in 30 seconds. Built by a GC for superintendents.',
+      'Photos, video, or voice — FieldVision fuses it all into one professional daily report in 30 seconds. Built by a construction project manager for superintendents.',
     type: 'website',
     url: 'https://getfieldvision.ai',
     images: ['/og-image.png'],
