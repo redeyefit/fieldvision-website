@@ -40,12 +40,13 @@ body {
   font-family: 'Space Grotesk', system-ui, sans-serif;
   background-color: var(--fv-black);
   color: #ffffff;
-  cursor: none;
+  /* Branded targeting-reticle cursor (OS-rendered = zero lag). Hotspot centered. */
+  cursor: url('/cursor.svg') 14 14, auto;
 }
 
-/* Restore cursor on interactive elements */
-a, button, input, select, textarea, [role="button"] {
-  cursor: none;
+/* Pointer hand on interactive elements */
+a, button, [role="button"] {
+  cursor: pointer;
 }
 
 /* ─── Cursor glow ─── */
@@ -62,10 +63,8 @@ a, button, input, select, textarea, [role="button"] {
   mix-blend-mode: screen;
 }
 
-/* Hide cursor glow on mobile */
+/* Hide cursor glow on touch devices */
 @media (hover: none) {
-  body { cursor: auto; }
-  a, button, input, select, textarea, [role="button"] { cursor: auto; }
   .cursor-glow { display: none; }
 }
 
@@ -90,7 +89,7 @@ a, button, input, select, textarea, [role="button"] {
 }
 
 .animate-loading-bar {
-  animation: loadingBar 2.2s ease-in-out forwards;
+  animation: loadingBar 1.4s ease-in-out forwards;
 }
 
 /* ─── Scroll dot in mouse indicator ─── */
