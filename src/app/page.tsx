@@ -377,7 +377,6 @@ export default function Home() {
           promise: 'To end the era of forgotten field notes.',
           desc: 'Photos, video, voice — tag rooms as you walk. One-handed, on the move. Everything you capture goes straight into your report.',
           screenshot: '/screenshots/01_home.png',
-          video: '/demos/capture',
           bgImage: '/section-01.webp',
         },
         {
@@ -407,7 +406,6 @@ export default function Home() {
           promise: 'To put codes, budgets, and schedules in your pocket.',
           desc: 'IRC egress requirements. HVAC budget. Inspection dates. One AI that knows building codes AND your entire project history.',
           screenshot: '/screenshots/03_project_sections.png',
-          video: '/demos/ask',
           bgImage: '/section-04.webp',
         },
       ].map((section, i) => (
