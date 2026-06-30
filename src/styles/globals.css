@@ -43,23 +43,30 @@ body {
   cursor: none;
 }
 
-/* Restore cursor on interactive elements */
+/* Restore pointer on interactive elements and nav */
 a, button, input, select, textarea, [role="button"] {
-  cursor: none;
+  cursor: pointer;
+}
+
+nav, nav * {
+  cursor: auto;
+}
+
+nav a, nav button {
+  cursor: pointer;
 }
 
 /* ─── Cursor glow ─── */
 .cursor-glow {
   position: fixed;
-  width: 400px;
-  height: 400px;
+  width: 300px;
+  height: 300px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(59, 155, 217, 0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, rgba(59, 155, 217, 0.03) 40%, transparent 65%);
   pointer-events: none;
   transform: translate(-50%, -50%);
   z-index: 9999;
-  transition: opacity 0.3s;
-  mix-blend-mode: screen;
+  transition: opacity 0.4s;
 }
 
 /* Hide cursor glow on mobile */
@@ -158,4 +165,12 @@ body::before {
 /* ─── Pin spacer fix ─── */
 .pin-spacer {
   overflow: visible !important;
+}
+
+/* ─── PWA safe area insets ─── */
+.safe-area-inset {
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
 }

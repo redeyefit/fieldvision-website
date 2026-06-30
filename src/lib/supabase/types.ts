@@ -95,6 +95,62 @@ export type AskResponse =
       warnings: string[];
     };
 
+// Daily Reports types (mirrors iOS DailyReport model + Supabase schema)
+export interface DailyReport {
+  id: string;
+  project_id: string;
+  user_id: string;
+  date: string;
+  sync_version: number;
+  work_status: string | null;
+  inspections: string | null;
+  rfis: string | null;
+  coordination_items: string | null;
+  project_name: string | null;
+  project_address: string | null;
+  ai_context: string | null;
+  progress_metrics: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Photo {
+  id: string;
+  project_id: string;
+  user_id: string;
+  log_entry_id: string | null;
+  file_url: string | null;
+  thumbnail_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VoiceNote {
+  id: string;
+  project_id: string;
+  user_id: string;
+  file_url: string | null;
+  transcript: string | null;
+  duration: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LogEntry {
+  id: string;
+  project_id: string;
+  user_id: string;
+  timestamp: string;
+  type: string;
+  sync_version: number;
+  notes: string | null;
+  location_label: string | null;
+  photo_notes: string | null;
+  sheet_reference: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Client-side state types
 export interface ScheduleState {
   project: Project | null;

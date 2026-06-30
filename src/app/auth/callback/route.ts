@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${requestUrl.origin}/auth?error=Missing+auth+code`);
   }
 
-  const supabase = createServerAuthClient();
+  const supabase = await createServerAuthClient();
   const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
   if (exchangeError) {
     return NextResponse.redirect(`${requestUrl.origin}/auth?error=${encodeURIComponent(exchangeError.message)}`);

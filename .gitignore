@@ -22,3 +22,10 @@ scripts/video/build/
 # pdfjs-dist assets (copied from node_modules via postinstall)
 public/cmaps/
 public/standard_fonts/
+
+# Serwist service worker (generated at build time)
+public/sw.js
+public/sw.js.map
+public/swe-worker-*.js
+public/workbox-*.js
+public/workbox-*.js.map
