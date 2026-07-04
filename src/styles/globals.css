@@ -40,8 +40,8 @@ body {
   font-family: 'Space Grotesk', system-ui, sans-serif;
   background-color: var(--fv-black);
   color: #ffffff;
-  /* Branded targeting-reticle cursor (OS-rendered = zero lag). Hotspot centered. */
-  cursor: url('/cursor.svg') 14 14, auto;
+  /* Branded FieldVision eye cursor (OS-rendered = zero lag). Hotspot on the pupil. */
+  cursor: url('/cursor-logo.png') 18 12, auto;
 }
 
 /* Pointer hand on interactive elements */

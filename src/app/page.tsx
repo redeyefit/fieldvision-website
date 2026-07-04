@@ -377,6 +377,7 @@ export default function Home() {
           promise: 'To end the era of forgotten field notes.',
           desc: 'Photos, video, voice — tag rooms as you walk. One-handed, on the move. Everything you capture goes straight into your report.',
           screenshot: '/screenshots/01_home.png',
+          video: '/demos/capture',
           bgImage: '/section-01.webp',
         },
         {
@@ -603,15 +604,12 @@ export default function Home() {
         <div className="max-w-4xl mx-auto">
           <div className="reveal relative bg-white/[0.02] border border-white/[0.06] rounded-2xl md:rounded-3xl p-8 md:p-14 overflow-hidden">
             <div className="absolute -top-24 -right-24 w-72 h-72 bg-fv-blue/[0.05] rounded-full blur-[110px]" />
-            <div className="relative flex flex-col md:flex-row md:items-center gap-8 md:gap-12">
-              {/* Icon */}
-              <div className="md:flex-shrink-0">
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-fv-blue/20 to-fv-blue/5 border border-fv-blue/20 flex items-center justify-center text-fv-blue">
-                  <ScanIcon />
-                </div>
-              </div>
+            <div className="relative flex flex-col md:flex-row md:items-center gap-10 md:gap-14">
               {/* Copy */}
               <div className="flex-1">
+                <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-fv-blue/20 to-fv-blue/5 border border-fv-blue/20 flex items-center justify-center text-fv-blue mb-6">
+                  <ScanIcon />
+                </div>
                 <div className="flex items-center gap-3 mb-4">
                   <span className="font-display text-[10px] font-semibold tracking-[0.3em] uppercase text-fv-blue">Add-on</span>
                   <span className="font-display text-[10px] font-semibold tracking-[0.15em] uppercase text-gray-300 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.03]">$10 / mo</span>
@@ -625,6 +623,26 @@ export default function Home() {
                 <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2.5 font-display font-semibold text-sm md:text-base px-6 md:px-7 py-3 md:py-3.5 bg-white text-black rounded-2xl hover:shadow-[0_0_50px_rgba(255,255,255,0.12)] transition-all duration-500">
                   <AppleIcon /> Get it on the App Store
                 </a>
+              </div>
+              {/* Real room-scan demo (from the YC demo) */}
+              <div className="md:flex-shrink-0 mx-auto md:mx-0">
+                <div className="bg-gradient-to-b from-[#2a2a2e] to-[#1a1a1e] rounded-[36px] md:rounded-[44px] p-[3px] md:p-[5px] shadow-[0_30px_80px_rgba(0,0,0,0.7)] border border-white/[0.06]">
+                  <div className="bg-black rounded-[33px] md:rounded-[40px] p-[2px]">
+                    <video
+                      muted
+                      loop
+                      playsInline
+                      preload="none"
+                      poster="/demos/roomscan-poster.jpg"
+                      width={260}
+                      height={563}
+                      className="ps-video rounded-[31px] md:rounded-[38px] w-44 md:w-52 lg:w-56 h-auto block"
+                    >
+                      <source src="/demos/roomscan.webm" type="video/webm" />
+                      <source src="/demos/roomscan.mp4" type="video/mp4" />
+                    </video>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
