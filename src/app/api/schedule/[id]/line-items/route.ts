@@ -1,27 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
+import { createServerClient } from '@/lib/supabase/client';
 import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
-
-// Helper to verify project ownership
-async function verifyProjectOwnership(
-  supabase: ReturnType<typeof createServerClient>,
-  projectId: string,
-  userId: string | null,
-  anonymousId: string | null
-): Promise<boolean> {
-  const { data } = await supabase
-    .from('projects')
-    .select('id, user_id, anonymous_id')
-    .eq('id', projectId)
-    .single();
-
-  if (!data) return false;
-
-  if (userId && data.user_id === userId) return true;
-  if (anonymousId && data.anonymous_id === anonymousId && verifyAnonymousId(anonymousId)) return true;
-
-  return false;
-}
+import { canAccessProject } from '@/lib/supabase/org';
 
 // PATCH /api/schedule/[id]/line-items - Update line items (confirm, edit)
 export async function PATCH(
@@ -41,7 +21,7 @@ export async function PATCH(
     await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
-    const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
+    const isOwner = await canAccessProject(id, userId, anonymousId);
     if (!isOwner) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
@@ -106,7 +86,7 @@ export async function DELETE(
     await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
-    const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
+    const isOwner = await canAccessProject(id, userId, anonymousId);
     if (!isOwner) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }

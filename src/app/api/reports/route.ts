@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/client';
 import { getAuthUserId } from '@/lib/supabase/auth';
+import { canAccessProject } from '@/lib/supabase/org';
 
 function corsHeaders() {
   return {
@@ -26,14 +27,19 @@ export async function GET(request: NextRequest) {
     const supabase = createServerClient();
     const projectId = request.nextUrl.searchParams.get('project_id');
 
-    let query = supabase
-      .from('daily_reports')
-      .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: false });
+    let query = supabase.from('daily_reports').select('*').order('date', { ascending: false });
 
     if (projectId) {
+      // Project-scoped: any org member/owner sees ALL of the project's reports —
+      // including those a field user created on the iOS app under a different
+      // account. That's the whole point of the office view.
+      if (!(await canAccessProject(projectId, userId, null))) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404, headers: corsHeaders() });
+      }
       query = query.eq('project_id', projectId);
+    } else {
+      // No project filter → just the caller's own reports across everything.
+      query = query.eq('user_id', userId);
     }
 
     const { data, error } = await query;

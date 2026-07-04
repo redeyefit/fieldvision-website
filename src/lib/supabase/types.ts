@@ -7,6 +7,7 @@ export interface Project {
   work_days: 'mon-fri' | 'mon-sat';
   user_id: string | null;        // Clerk user ID
   anonymous_id: string | null;   // HMAC-signed token for anonymous users
+  org_id: string | null;         // owning organization (team-shared projects)
   pdf_url: string | null;        // Vercel Blob URL
   created_at: string;
   updated_at: string;
@@ -44,6 +45,7 @@ export interface CreateProjectRequest {
   name: string;
   start_date?: string;
   work_days?: 'mon-fri' | 'mon-sat';
+  org_id?: string;   // create the project inside this org (admin-gated, team-shared)
 }
 
 export interface ParsePDFResponse {

@@ -1,28 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
+import { createServerClient } from '@/lib/supabase/client';
+import { canAccessProject } from '@/lib/supabase/org';
 import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
 import { recalculateTasks } from '@/lib/schedule/workdays';
-
-// Helper to verify project ownership
-async function verifyProjectOwnership(
-  supabase: ReturnType<typeof createServerClient>,
-  projectId: string,
-  userId: string | null,
-  anonymousId: string | null
-): Promise<boolean> {
-  const { data } = await supabase
-    .from('projects')
-    .select('id, user_id, anonymous_id')
-    .eq('id', projectId)
-    .single();
-
-  if (!data) return false;
-
-  if (userId && data.user_id === userId) return true;
-  if (anonymousId && data.anonymous_id === anonymousId && verifyAnonymousId(anonymousId)) return true;
-
-  return false;
-}
 
 // PATCH /api/schedule/[id]/tasks - Update tasks (reorder, edit)
 export async function PATCH(
@@ -42,7 +22,7 @@ export async function PATCH(
     await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
-    const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
+    const isOwner = await canAccessProject(id, userId, anonymousId);
     if (!isOwner) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
@@ -100,25 +80,49 @@ export async function PATCH(
       }
     }
 
-    // Upsert each task (insert new ones, update existing ones)
+    // Write each task. SECURITY: never upsert-by-PK here — tasks.id is a global
+    // UUID, so an upsert with a client-supplied id belonging to ANOTHER project
+    // would reassign/overwrite that row (cross-tenant write, RLS bypassed by the
+    // service-role client). Instead:
+    //   - id already in THIS project  → UPDATE scoped by project_id
+    //   - id not in this project       → plain INSERT (a PK collision with another
+    //                                     project's task fails closed, never overwrites)
+    const existingIdSet = new Set(existingIds);
     for (const task of finalTasks) {
-      const { error } = await supabase
-        .from('tasks')
-        .upsert({
-          id: task.id,
-          project_id: id,
-          name: task.name,
-          trade: task.trade,
-          duration_days: task.duration_days,
-          start_date: task.start_date,
-          end_date: task.end_date,
-          depends_on: task.depends_on,
-          sequence_index: task.sequence_index,
-        });
+      const row = {
+        project_id: id,
+        name: task.name,
+        trade: task.trade,
+        duration_days: task.duration_days,
+        start_date: task.start_date,
+        end_date: task.end_date,
+        depends_on: task.depends_on,
+        sequence_index: task.sequence_index,
+      };
 
-      if (error) {
-        console.error('Upsert error:', error);
-        return NextResponse.json({ error: 'Failed to update tasks' }, { status: 500 });
+      if (task.id && existingIdSet.has(task.id)) {
+        const { error } = await supabase
+          .from('tasks')
+          .update(row)
+          .eq('id', task.id)
+          .eq('project_id', id);
+        if (error) {
+          console.error('Task update error:', error);
+          return NextResponse.json({ error: 'Failed to update tasks' }, { status: 500 });
+        }
+      } else {
+        const { error } = await supabase
+          .from('tasks')
+          .insert(task.id ? { id: task.id, ...row } : row);
+        if (error) {
+          console.error('Task insert error:', error);
+          // A duplicate-key error means the client supplied an id owned elsewhere.
+          const isConflict = error.code === '23505';
+          return NextResponse.json(
+            { error: isConflict ? 'Invalid task id' : 'Failed to create tasks' },
+            { status: isConflict ? 409 : 500 }
+          );
+        }
       }
     }
 

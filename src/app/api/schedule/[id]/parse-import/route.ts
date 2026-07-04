@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
+import { createServerClient } from '@/lib/supabase/client';
+import { canAccessProject } from '@/lib/supabase/org';
 import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
 import { parseSchedulePDFWithGemini } from '@/lib/ai/gemini';
 import { extractText } from 'unpdf';
@@ -7,27 +8,6 @@ import { tryRegexExtract as tryRegexExtractShared } from '@/lib/pdf/regex-parser
 import { extractTextServerSide } from '@/lib/pdf/server-extract';
 
 export const maxDuration = 60;
-
-// Helper to verify project ownership
-async function verifyProjectOwnership(
-  supabase: ReturnType<typeof createServerClient>,
-  projectId: string,
-  userId: string | null,
-  anonymousId: string | null
-): Promise<boolean> {
-  const { data } = await supabase
-    .from('projects')
-    .select('id, user_id, anonymous_id')
-    .eq('id', projectId)
-    .single();
-
-  if (!data) return false;
-
-  if (userId && data.user_id === userId) return true;
-  if (anonymousId && data.anonymous_id === anonymousId && verifyAnonymousId(anonymousId)) return true;
-
-  return false;
-}
 
 // POST /api/schedule/[id]/parse-import - Upload schedule PDF, extract tasks with dates
 export async function POST(
@@ -64,7 +44,7 @@ export async function POST(
     await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     diag.step = 'ownership';
-    const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
+    const isOwner = await canAccessProject(id, userId, anonymousId);
     if (!isOwner) {
       return NextResponse.json({ error: 'Project not found', debug: { ...diag, step: 'ownership_failed' } }, { status: 404 });
     }

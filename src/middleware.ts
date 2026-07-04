@@ -3,47 +3,66 @@ import type { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { rateLimit } from '@/lib/rate-limit';
 
+// Fail-closed default for any AI-family POST that matches no specific key below.
+// Ensures a NEW paid endpoint is never silently uncapped — conservative, well
+// above legitimate interactive use but a hard ceiling on abuse.
+const DEFAULT_AI_LIMIT_KEY = 'ai-default';
+
 // Rate limits per endpoint pattern (requests per window)
 const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
   // AI-heavy endpoints — tight limits
   '/api/schedule/ask-general': { max: 10, windowMs: 60_000 },        // 10/min
   'parse': { max: 5, windowMs: 60_000 },                             // 5/min (PDF + Gemini)
+  'parse-import': { max: 5, windowMs: 60_000 },                      // 5/min (PDF + Gemini)
+  'import': { max: 5, windowMs: 60_000 },                            // 5/min (Claude inferDependencies)
   'generate': { max: 5, windowMs: 60_000 },                          // 5/min (Claude)
   'ask': { max: 15, windowMs: 60_000 },                              // 15/min (Ask the Field)
+  'reports-generate': { max: 5, windowMs: 60_000 },                  // 5/min (Claude)
   // Project creation — moderate
   '/api/schedule': { max: 20, windowMs: 60_000 },                    // 20/min
+  // Fail-closed default — any unmatched AI-family POST
+  [DEFAULT_AI_LIMIT_KEY]: { max: 30, windowMs: 60_000 },             // 30/min
 };
 
-function getRateLimitKey(pathname: string): string | null {
+function getRateLimitKey(pathname: string): string {
   if (pathname === '/api/schedule/ask-general') return '/api/schedule/ask-general';
   if (pathname.match(/^\/api\/schedule\/[^/]+\/parse$/)) return 'parse';
+  if (pathname.match(/^\/api\/schedule\/[^/]+\/parse-import$/)) return 'parse-import';
+  if (pathname.match(/^\/api\/schedule\/[^/]+\/import$/)) return 'import';
   if (pathname.match(/^\/api\/schedule\/[^/]+\/generate$/)) return 'generate';
   if (pathname.match(/^\/api\/schedule\/[^/]+\/ask$/)) return 'ask';
   if (pathname === '/api/schedule') return '/api/schedule';
-  return null;
+  if (pathname === '/api/reports/generate') return 'reports-generate';
+  // Unmatched AI-family POST → fail-closed default, never unlimited.
+  return DEFAULT_AI_LIMIT_KEY;
 }
 
 export async function middleware(request: NextRequest) {
-  // Rate limiting for API routes
-  if (request.nextUrl.pathname.startsWith('/api/schedule') && request.method === 'POST') {
+  // Rate limiting for paid AI-family API routes (POST only).
+  // Scoped to the /api/schedule and /api/reports prefixes so GET and non-AI
+  // routes are untouched. getRateLimitKey() always returns a key (fail-closed),
+  // so a NEW endpoint under these prefixes is never silently uncapped.
+  const isAiFamilyPost =
+    (request.nextUrl.pathname.startsWith('/api/schedule')
+      || request.nextUrl.pathname.startsWith('/api/reports'))
+    && request.method === 'POST';
+
+  if (isAiFamilyPost) {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
       || request.headers.get('x-real-ip')
       || 'unknown';
     const limitKey = getRateLimitKey(request.nextUrl.pathname);
-
-    if (limitKey) {
-      const limit = RATE_LIMITS[limitKey];
-      if (limit) {
-        const result = rateLimit(ip, limitKey, limit.max, limit.windowMs);
-        if (result) {
-          return NextResponse.json(
-            { error: 'Too many requests. Please try again later.' },
-            {
-              status: 429,
-              headers: { 'Retry-After': String(result.retryAfter) },
-            }
-          );
-        }
+    const limit = RATE_LIMITS[limitKey];
+    if (limit) {
+      const result = rateLimit(ip, limitKey, limit.max, limit.windowMs);
+      if (result) {
+        return NextResponse.json(
+          { error: 'Too many requests. Please try again later.' },
+          {
+            status: 429,
+            headers: { 'Retry-After': String(result.retryAfter) },
+          }
+        );
       }
     }
   }
@@ -82,7 +101,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected routes — redirect to /auth if not authenticated
-  const protectedPaths = ['/schedule', '/dashboard'];
+  const protectedPaths = ['/schedule', '/dashboard', '/projects', '/reports'];
   const isProtectedRoute = protectedPaths.some(p => request.nextUrl.pathname.startsWith(p));
   if (isProtectedRoute && !user) {
     const redirectUrl = request.nextUrl.clone();

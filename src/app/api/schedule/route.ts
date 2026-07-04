@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, generateAnonymousId, verifyAnonymousId } from '@/lib/supabase/client';
 import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
+import { getUserOrgIds, isOrgAdmin } from '@/lib/supabase/org';
 import { Project, CreateProjectRequest } from '@/lib/supabase/types';
 
 const FREE_PROJECT_LIMIT = 3;
@@ -39,7 +40,14 @@ export async function GET(request: NextRequest) {
     let query = supabase.from('projects').select('*').order('updated_at', { ascending: false });
 
     if (userId) {
-      query = query.eq('user_id', userId);
+      // Team-scoped: the user's own projects PLUS every project in an org they
+      // belong to. org-shared projects are how a teammate sees the team's work.
+      const orgIds = await getUserOrgIds(userId);
+      if (orgIds.length > 0) {
+        query = query.or(`user_id.eq.${userId},org_id.in.(${orgIds.join(',')})`);
+      } else {
+        query = query.eq('user_id', userId);
+      }
     } else if (anonymousId && verifyAnonymousId(anonymousId)) {
       query = query.eq('anonymous_id', anonymousId);
     } else {
@@ -85,9 +93,22 @@ export async function POST(request: NextRequest) {
     const supabase = createServerClient();
     await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
-    // Check subscription status — only enforce limit for free-tier / anonymous users
-    let enforceLimit = true;
-    if (userId) {
+    // Team-shared project: must be authenticated + an admin/owner of the target org.
+    let orgId: string | null = null;
+    if (body.org_id) {
+      if (!userId) {
+        return NextResponse.json({ error: 'Sign in to create a team project' }, { status: 401, headers: corsHeaders() });
+      }
+      if (!(await isOrgAdmin(userId, body.org_id))) {
+        return NextResponse.json({ error: 'Only an org owner or admin can create team projects' }, { status: 403, headers: corsHeaders() });
+      }
+      orgId = body.org_id;
+    }
+
+    // Check subscription status — only enforce limit for free-tier / anonymous users.
+    // Org projects are governed by the org's plan (limit deferred), so skip the per-user cap.
+    let enforceLimit = !orgId;
+    if (userId && enforceLimit) {
       const { data: subscription } = await supabase
         .from('user_subscriptions')
         .select('tier, status')
@@ -131,6 +152,7 @@ export async function POST(request: NextRequest) {
       work_days: body.work_days || 'mon-fri',
       user_id: userId || null,
       anonymous_id: userId ? null : anonymousId,
+      org_id: orgId,
     };
 
     const { data, error } = await supabase

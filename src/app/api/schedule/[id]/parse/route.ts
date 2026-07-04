@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
+import { createServerClient } from '@/lib/supabase/client';
+import { canAccessProject } from '@/lib/supabase/org';
 import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
 import { parseContractPDFWithGemini } from '@/lib/ai/gemini';
 import { extractText } from 'unpdf';
@@ -23,27 +24,6 @@ export async function OPTIONS() {
     status: 204,
     headers: corsHeaders(),
   });
-}
-
-// Helper to verify project ownership
-async function verifyProjectOwnership(
-  supabase: ReturnType<typeof createServerClient>,
-  projectId: string,
-  userId: string | null,
-  anonymousId: string | null
-): Promise<boolean> {
-  const { data } = await supabase
-    .from('projects')
-    .select('id, user_id, anonymous_id')
-    .eq('id', projectId)
-    .single();
-
-  if (!data) return false;
-
-  if (userId && data.user_id === userId) return true;
-  if (anonymousId && data.anonymous_id === anonymousId && verifyAnonymousId(anonymousId)) return true;
-
-  return false;
 }
 
 // POST /api/schedule/[id]/parse - Upload PDF and extract line items
@@ -74,7 +54,7 @@ export async function POST(
     console.log(`[Parse] Supabase client created at ${Date.now() - startTime}ms`);
 
     // Verify ownership
-    const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
+    const isOwner = await canAccessProject(id, userId, anonymousId);
     console.log(`[Parse] Ownership verified: ${isOwner} at ${Date.now() - startTime}ms`);
     if (!isOwner) {
       const response = NextResponse.json({ error: 'Project not found' }, { status: 404 });

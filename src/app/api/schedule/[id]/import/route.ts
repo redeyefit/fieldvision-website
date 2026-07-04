@@ -1,32 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
+import { createServerClient } from '@/lib/supabase/client';
+import { canAccessProject } from '@/lib/supabase/org';
 import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
 import { inferDependencies } from '@/lib/ai/anthropic';
 import { v4 as uuidv4 } from 'uuid';
 
 // AI dependency inference can take a moment for large schedules
 export const maxDuration = 60;
-
-// Helper to verify project ownership
-async function verifyProjectOwnership(
-  supabase: ReturnType<typeof createServerClient>,
-  projectId: string,
-  userId: string | null,
-  anonymousId: string | null
-): Promise<boolean> {
-  const { data } = await supabase
-    .from('projects')
-    .select('id, user_id, anonymous_id')
-    .eq('id', projectId)
-    .single();
-
-  if (!data) return false;
-
-  if (userId && data.user_id === userId) return true;
-  if (anonymousId && data.anonymous_id === anonymousId && verifyAnonymousId(anonymousId)) return true;
-
-  return false;
-}
 
 interface ImportedTask {
   name: string;
@@ -54,7 +34,7 @@ export async function POST(
     await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
-    const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
+    const isOwner = await canAccessProject(id, userId, anonymousId);
     if (!isOwner) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }

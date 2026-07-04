@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/client';
 import { getAuthUserId } from '@/lib/supabase/auth';
+import { canAccessProject } from '@/lib/supabase/org';
 
 function corsHeaders() {
   return {
@@ -29,15 +30,20 @@ export async function GET(
     const { id } = await params;
     const supabase = createServerClient();
 
-    // Fetch report
+    // Fetch report by id, then authorize by PROJECT access (owner OR org member),
+    // not by report.user_id — the office view must open reports a field user
+    // created under a different account. Mirrors the project-scoped list route.
     const { data: report, error: reportError } = await supabase
       .from('daily_reports')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
       .single();
 
     if (reportError || !report) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404, headers: corsHeaders() });
+    }
+
+    if (!(await canAccessProject(report.project_id, userId, null))) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404, headers: corsHeaders() });
     }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createServerClient } from '@/lib/supabase/client';
 import { getAuthUserId } from '@/lib/supabase/auth';
+import { canAccessProject } from '@/lib/supabase/org';
 import { v4 as uuidv4 } from 'uuid';
 
 // Report generation can take time with large projects
@@ -39,12 +40,15 @@ export async function POST(request: NextRequest) {
     const supabase = createServerClient();
     const reportDate = date ? new Date(date) : new Date();
 
-    // Verify project ownership
+    // Authorize by project access (owner OR org member) so a teammate can
+    // generate a report for a shared project — not just the original owner.
+    if (!(await canAccessProject(project_id, userId, null))) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404, headers: corsHeaders() });
+    }
     const { data: project } = await supabase
       .from('projects')
       .select('id, name, address, user_id')
       .eq('id', project_id)
-      .eq('user_id', userId)
       .single();
 
     if (!project) {

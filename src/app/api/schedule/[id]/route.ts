@@ -1,27 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient, verifyAnonymousId } from '@/lib/supabase/client';
+import { createServerClient } from '@/lib/supabase/client';
 import { getAuthUserId, migrateAnonymousProjectsIfNeeded } from '@/lib/supabase/auth';
-
-// Helper to verify project ownership
-async function verifyProjectOwnership(
-  supabase: ReturnType<typeof createServerClient>,
-  projectId: string,
-  userId: string | null,
-  anonymousId: string | null
-): Promise<boolean> {
-  const { data } = await supabase
-    .from('projects')
-    .select('id, user_id, anonymous_id')
-    .eq('id', projectId)
-    .single();
-
-  if (!data) return false;
-
-  if (userId && data.user_id === userId) return true;
-  if (anonymousId && data.anonymous_id === anonymousId && verifyAnonymousId(anonymousId)) return true;
-
-  return false;
-}
+import { canAccessProject, isOrgAdmin } from '@/lib/supabase/org';
 
 // GET /api/schedule/[id] - Get project with line items and tasks
 export async function GET(
@@ -41,7 +21,7 @@ export async function GET(
     await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
-    const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
+    const isOwner = await canAccessProject(id, userId, anonymousId);
     if (!isOwner) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
@@ -86,7 +66,7 @@ export async function PATCH(
     await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
-    const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
+    const isOwner = await canAccessProject(id, userId, anonymousId);
     if (!isOwner) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
@@ -143,9 +123,20 @@ export async function DELETE(
     await migrateAnonymousProjectsIfNeeded(userId, anonymousId);
 
     // Verify ownership
-    const isOwner = await verifyProjectOwnership(supabase, id, userId, anonymousId);
+    const isOwner = await canAccessProject(id, userId, anonymousId);
     if (!isOwner) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
+
+    // Deleting a TEAM project (org-owned) is owner/admin-only — a plain member can
+    // edit the schedule but not destroy the whole project (delete cascades to its
+    // line_items/tasks/reports). Personal projects (org_id null) keep prior behavior.
+    const { data: proj } = await supabase.from('projects').select('org_id').eq('id', id).single();
+    if (proj?.org_id && userId && !(await isOrgAdmin(userId, proj.org_id))) {
+      return NextResponse.json(
+        { error: 'Only an org owner or admin can delete a team project' },
+        { status: 403 }
+      );
     }
 
     const { error } = await supabase.from('projects').delete().eq('id', id);

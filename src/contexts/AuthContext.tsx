@@ -131,14 +131,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function init() {
       try {
-        const { data: { session } } = await supabase!.auth.getSession();
+        // getSession() can hang indefinitely inside @supabase/ssr's navigator-lock
+        // auth coordination (a known deadlock). It must NEVER block the app on
+        // "Loading..." forever — race it against a timeout and fall back to the
+        // cached session so a logged-in user isn't stranded.
+        const timeout = new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), 4000));
+        const raced = await Promise.race([supabase!.auth.getSession(), timeout]);
         if (!mounted) return;
 
+        const session = raced === 'timeout' ? null : raced.data.session;
+
         if (session?.user) {
-          const sub = await fetchSubscription(session.user.id);
-          if (!mounted) return;
-          setState((s) => ({ ...s, user: session.user, session, isLoading: false, subscription: sub }));
+          // Unblock the app the moment auth is known — do NOT await the
+          // subscription lookup (a slow/errored user_subscriptions query must
+          // never leave ProtectedRoute stuck on "Loading..."). Load the
+          // subscription in the background and patch it in when it arrives.
+          setState((s) => ({ ...s, user: session.user, session, isLoading: false }));
           cacheSession(session, session.user);
+          fetchSubscription(session.user.id).then((sub) => {
+            if (mounted) setState((s) => ({ ...s, subscription: sub }));
+          });
+        } else if (raced === 'timeout') {
+          // getSession stalled — trust the cached session if we have one, so a
+          // transient lock stall doesn't bounce an authenticated user to /auth.
+          const cached = getCachedSession();
+          setState((s) => ({ ...s, user: cached.user, session: cached.session, isLoading: false }));
+          if (cached.user) {
+            fetchSubscription(cached.user.id).then((sub) => {
+              if (mounted) setState((s) => ({ ...s, subscription: sub }));
+            });
+          }
         } else {
           // No active session — try cached for offline
           const cached = getCachedSession();
