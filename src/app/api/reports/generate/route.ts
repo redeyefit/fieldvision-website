@@ -162,7 +162,7 @@ No field data was captured today via the app. Generate a clean template report w
 
     // Generate with Claude
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5-5', // claude-sonnet-4-20250514 retired 2026-06-15
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     });

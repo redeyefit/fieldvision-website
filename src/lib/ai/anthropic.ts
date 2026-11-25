@@ -14,6 +14,13 @@ const anthropic = new Anthropic({
   apiKey: apiKey,
 });
 
+// claude-sonnet-4-20250514 was retired 2026-06-15 (API answers 404). On claude-sonnet-5-5 a non-default
+// temperature and a forced tool_choice ({type:'tool'} / {type:'any'}) each answer 400, and adaptive thinking runs
+// by default. So: no temperature, tool_choice auto with the tool named in the system prompt, and `between_tools`
+// thinking (no upfront thinking block before the answer). Same shape as FieldVision-iOS/website/src/lib/ai/anthropic.ts.
+const CLAUDE_MODEL = 'claude-sonnet-5-5';
+const NO_UPFRONT_THINKING = { type: 'between_tools' } as unknown as Anthropic.ThinkingConfigParam;
+
 // Tool definitions for Claude to use structured output
 const PARSE_PDF_TOOL = {
   name: 'extract_line_items',
@@ -114,16 +121,16 @@ export async function parseContractPDF(
 
   const systemPrompt = `You are a construction contract analyst. Extract all scope items, work items, and deliverables from the contract text. Categorize each by trade. Be thorough - include all work mentioned. Ignore pricing, terms, and conditions - focus only on WORK to be performed.`;
 
-  console.log('[Anthropic] Calling Claude API with model claude-sonnet-4-20250514');
+  console.log(`[Anthropic] Calling Claude API with model ${CLAUDE_MODEL}`);
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514', // Sonnet 4 - reliable and thorough for contract parsing
+      model: CLAUDE_MODEL,
+      thinking: NO_UPFRONT_THINKING,
       max_tokens: 8192, // Increased from 4096 - complex PDFs need more tokens for full JSON output
-      temperature: 0, // Deterministic output - same PDF should extract same items
-      system: systemPrompt,
+      system: `${systemPrompt}\n\nAlways answer by calling the extract_line_items tool.`,
       tools: [PARSE_PDF_TOOL],
-      tool_choice: { type: 'tool', name: 'extract_line_items' },
+      tool_choice: { type: 'auto' },
       messages: [
         {
           role: 'user',
@@ -238,12 +245,12 @@ async function generateScheduleBatch(
   const contextNote = batchContext ? `\n\nCONTEXT: ${batchContext}` : '';
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: CLAUDE_MODEL,
+    thinking: NO_UPFRONT_THINKING,
     max_tokens: 16384,
-    temperature: 0,
-    system: SCHEDULE_SYSTEM_PROMPT,
+    system: `${SCHEDULE_SYSTEM_PROMPT}\n\nAlways answer by calling the generate_schedule tool.`,
     tools: [GENERATE_SCHEDULE_TOOL],
-    tool_choice: { type: 'tool', name: 'generate_schedule' },
+    tool_choice: { type: 'auto' },
     messages: [
       {
         role: 'user',
@@ -405,12 +412,12 @@ DEPENDENCY RULES:
 - Trim phases depend on drywall/paint, not on rough-in completion`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: CLAUDE_MODEL,
+    thinking: NO_UPFRONT_THINKING,
     max_tokens: 16384,
-    temperature: 0,
-    system: sequencingPrompt,
+    system: `${sequencingPrompt}\n\nAlways answer by calling the generate_schedule tool.`,
     tools: [GENERATE_SCHEDULE_TOOL],
-    tool_choice: { type: 'tool', name: 'generate_schedule' },
+    tool_choice: { type: 'auto' },
     messages: [
       {
         role: 'user',
@@ -524,12 +531,12 @@ If the enrichment includes warnings about missing items, consider adding them if
     : '';
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: CLAUDE_MODEL,
+    thinking: NO_UPFRONT_THINKING,
     max_tokens: 8192,
-    temperature: 0,
-    system: systemPrompt,
+    system: `${systemPrompt}\n\nAlways answer by calling the generate_schedule tool.`,
     tools: [GENERATE_SCHEDULE_TOOL],
-    tool_choice: { type: 'tool', name: 'generate_schedule' },
+    tool_choice: { type: 'auto' },
     messages: [
       {
         role: 'user',
@@ -635,12 +642,12 @@ RULES:
 IMPORTANT: Return ALL tasks, even ones with no dependencies (empty depends_on_indices array).`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: CLAUDE_MODEL,
+    thinking: NO_UPFRONT_THINKING,
     max_tokens: 8192,
-    temperature: 0,
-    system: systemPrompt,
+    system: `${systemPrompt}\n\nAlways answer by calling the infer_dependencies tool.`,
     tools: [INFER_DEPENDENCIES_TOOL],
-    tool_choice: { type: 'tool', name: 'infer_dependencies' },
+    tool_choice: { type: 'auto' },
     messages: [
       {
         role: 'user',
@@ -750,7 +757,8 @@ ${context.tasks.map((t, i) => `${i + 1}. ${t.name} (${t.trade}) - ${t.duration_d
 Be concise and practical. Speak like an experienced superintendent.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: CLAUDE_MODEL,
+    thinking: NO_UPFRONT_THINKING,
     max_tokens: 1024,
     system: systemPrompt,
     messages: [
@@ -841,7 +849,8 @@ ${taskList}
 Be concise and practical. Speak like an experienced superintendent.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: CLAUDE_MODEL,
+    thinking: NO_UPFRONT_THINKING,
     max_tokens: 2048,
     system: systemPrompt,
     tools: [MODIFY_SCHEDULE_TOOL],

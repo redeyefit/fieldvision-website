@@ -59,7 +59,7 @@ async function runGemini(prompt: RenderedPrompt, imagePath?: string): Promise<an
     throw new Error('GEMINI_API_KEY not set');
   }
 
-  const model = 'gemini-2.0-flash';
+  const model = 'gemini-3.6-flash'; // gemini-2.0-flash shut down 2026-06-01
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
   const parts: any[] = [{ text: prompt.user }];
@@ -140,7 +140,7 @@ async function runClaude(prompt: RenderedPrompt, imagePath?: string): Promise<an
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5-5', // claude-sonnet-4-20250514 retired 2026-06-15
       max_tokens: 4096,
       system: prompt.system,
       messages: [{ role: 'user', content }]
@@ -153,7 +153,8 @@ async function runClaude(prompt: RenderedPrompt, imagePath?: string): Promise<an
   }
 
   const data: any = await response.json();
-  const text = data.content?.[0]?.text;
+  // claude-sonnet-5-5 thinks by default, so the first block can be a thinking block: read the first text block.
+  const text = data.content?.find((b: any) => b.type === 'text')?.text;
 
   if (!text) {
     throw new Error('No response from Claude');
